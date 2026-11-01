@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>שאלון התאמת קורסים - יחידה ללימודי המשך הטכניון</title>
+
+  <!-- Google Fonts - Poppins + Open Sans עם עברית -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&display=swap&subset=hebrew" rel="stylesheet"/>
+
+  <style>
+    :root{
+      /* צבעי רקע - gradient כחול */
+      --bg-color-1:#0f2847;
+      --bg-color-2:#2d5a8f;
+      
+      /* צבע הכרטיס */
+      --card-bg:rgba(255, 255, 255, 0.95);
+      
+      /* צבעים עיקריים */
+      --primary-color:#1a365d;
+      --primary-hover:#0f2847;
+      --secondary-color:#d4a013;
+      --secondary-hover:#b6840f;
+      
+      /* טקסט */
+      --text-color:#333;
+      --text-light:#6c757d;
+      
+      /* גבולות */
+      --border-color:rgba(0, 0, 0, 0.1);
+      
+      /* צבעים לרדיו/צ'קבוקס */
+      --blue-500:#3b82f6;
+      --blue-100:#e6f0ff;
+    }
+
+    *{margin:0; padding:0; box-sizing:border-box;}
+
+    html, body{
+      height:100%;
+      overflow-x:hidden;
+    }
+
+    body{
+      font-family:'Poppins', "Reforma","Open Sans Hebrew","Open Sans",arial,sans-serif;
+      background:linear-gradient(135deg, var(--bg-color-1) 0%, var(--bg-color-2) 100%);
+      min-height:100vh; 
+      line-height:1.5; 
+      color:var(--text-color);
+      position:relative;
+    }
+    
+    /* רקע סטטי יפה */
+    body::before {
+      content:'';
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+      width:100%;
+      height:100%;
+      background:radial-gradient(circle at top right, rgba(212, 160, 19, 0.15) 0%, transparent 50%),
+                 radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+      z-index:0;
+      pointer-events:none;
+    }
+
+    /* Header */
+    .header{ 
+      background:rgba(15, 40, 71, 0.95); 
+      backdrop-filter:blur(10px); 
+      padding:15px 0; 
+      border-bottom:1px solid rgba(255,255,255,0.1);
+      position:relative;
+      z-index:100;
+    }
+    .header-content{ 
+      max-width:1200px; 
+      margin:0 auto; 
+      padding:0 20px; 
+      display:flex; 
+      justify-content:space-between; 
+      align-items:center; 
+      gap:16px; 
+    }
+    .brand-title{ 
+      color:#fff; 
+      font-weight:600; 
+      font-size:18px; 
+      line-height:1.4; 
+      letter-spacing:0.3px;
+    }
+    .contact-info{ 
+      color:#fff; 
+      font-size:14px; 
+      text-align:left; 
+      opacity:0.95; 
+      font-weight:400;
+      letter-spacing:0.2px;
+    }
+
+    /* Hero */
+    .hero{ 
+      background:transparent;
+      color:#fff; 
+      padding:60px 20px; 
+      text-align:center; 
+      position:relative; 
+      z-index:1;
+    }
+    .hero-content{ position:relative; z-index:1; max-width:800px; margin:0 auto; }
+    .hero h1{ font-size:32px; font-weight:700; margin-bottom:15px; line-height:1.3; text-shadow:0 2px 10px rgba(0,0,0,0.2); }
+    .hero p{ font-size:16px; opacity:0.95; font-weight:400; }
+
+    /* Main */
+    .container{
+      max-width:800px;
+      margin:20px auto;
+      background:var(--card-bg);
+      box-shadow:0 1rem 3rem rgba(0,0,0,0.15);
+      border-radius:1.5rem;
+      position:relative;
+      z-index:1;
+      animation:fadeInGrow 0.6s ease-out forwards;
+      min-height:400px;
+    }
+    
+    @keyframes fadeInGrow {
+      from { 
+        opacity:0; 
+        transform:scale(0.95);
+        box-shadow:0 0.5rem 1.5rem rgba(0,0,0,0.1);
+      }
+      to { 
+        opacity:1; 
+        transform:scale(1);
+        box-shadow:0 1rem 3rem rgba(0,0,0,0.15);
+      }
+    }
+    
+    .form-wrapper{ padding:2.5rem; }
+
+    /* Progress - Sticky with smooth animation */
+    .progress-wrapper{ 
+      margin-bottom:40px; 
+      margin-top:20px;
+      text-align:center; 
+      background:var(--primary-color);
+      padding:18px 24px;
+      position:sticky;
+      top:20px;
+      z-index:100;
+      border-radius:16px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
+      transition:all 0.3s ease;
+      backdrop-filter:blur(10px);
+    }
+    .progress-wrapper.scrolled{
+      transform:scale(1.06);
+      box-shadow:0 10px 30px rgba(26, 54, 93, 0.35);
+      background:linear-gradient(135deg, #1a365d 0%, #2d5a8f 100%);
+      padding:20px 26px;
+    }
+    .progress-text{ 
+      font-size:14px; 
+      color:#fff; 
+      margin-bottom:10px; 
+      font-weight:600; 
+      transition:all 0.4s ease;
+    }
+    .progress-wrapper.scrolled .progress-text{
+      font-size:16px;
+      font-weight:700;
+    }
+    .progress-bar{ 
+      width:100%; 
+      max-width:500px; 
+      height:8px; 
+      background:#d1d5db; 
+      border-radius:4px; 
+      overflow:hidden; 
+      margin:0 auto;
+      transition:all 0.4s ease;
+    }
+    .progress-wrapper.scrolled .progress-bar{
+      height:10px;
+      max-width:560px;
+      border-radius:5px;
+    }
+    .progress-fill{ 
+      height:100%; 
+      background:var(--secondary-color);
+      width:0%; 
+      transition:all .5s ease-in-out;
+      border-radius:4px;
+      box-shadow:0 0 15px rgba(212, 160, 19, 0.6), 0 0 30px rgba(212, 160, 19, 0.3);
+    }
+    .progress-wrapper.scrolled .progress-fill{
+      box-shadow:0 0 20px rgba(212, 160, 19, 0.7), 0 0 35px rgba(212, 160, 19, 0.4);
+      border-radius:5px;
+    }
+
+    /* Sections */
+    .section{ 
+      margin-bottom:40px; 
+      padding-bottom:30px; 
+      border-bottom:none;
+      position:relative;
+    }
+    .section::after{
+      content:'';
+      position:absolute;
+      bottom:0;
+      left:0;
+      right:0;
+      height:8px;
+      background:#e2e8f0;
+      border-radius:4px;
+    }
+    .section-title{ font-size:20px; color:var(--primary-color); margin-bottom:0.5rem; font-weight:700; }
+    .section-title + p { color:var(--text-light); margin-bottom:2rem; font-size:14px; font-weight:400; }
+
+    /* Form elements */
+    .form-group{ margin-bottom:20px; position:relative; }
+    .form-group label{ display:block; margin-bottom:8px; color:#333; font-size:14px; }
+    .required{ color:#e53e3e; }
+    .form-group input[type="text"],
+    .form-group input[type="tel"],
+    .form-group input[type="email"],
+    .form-group select{
+      width:100%; padding:12px 14px; border:1px solid var(--border-color); border-radius:0.75rem; font-size:14px; background:#fff;
+      font-family:inherit;
+      transform-origin:right center;
+      transition:all .2s ease;
+    }
+    
+    /* Textarea - separate to avoid lag on resize */
+    .form-group textarea{
+      width:100%; padding:12px 14px; border:1px solid var(--border-color); border-radius:0.75rem; font-size:14px; background:#fff;
+      font-family:inherit;
+      transform-origin:right center;
+      min-height:110px; resize:vertical;
+      transition:transform .2s ease, border-color .2s ease;
+    }
+    
+    /* LTR input for email */
+    .form-group input[type="email"]{
+      direction:ltr;
+      text-align:left;
+    }
+    
+    
+    /* Scale animation for all text inputs, selects and textareas on focus */
+    .form-group input[type="text"]:focus,
+    .form-group input[type="tel"]:focus,
+    .form-group input[type="email"]:focus,
+    .form-group select:focus,
+    .form-group textarea:focus{
+      transform:scale(1.005);
+    }
+    
+    /* Caps lock warning - info style */
+    .caps-lock-warning{
+      display:none;
+      color:#333;
+      font-size:12px;
+      margin-top:5px;
+      font-weight:500;
+      text-align:right;
+    }
+    .caps-lock-warning.visible{ display:block; }
+    
+    /* Question box styling */
+    .question-box{
+      border:3px solid #2d5a8f;
+      border-radius:12px;
+      padding:20px;
+      margin-bottom:25px;
+      background:#ffffff;
+      box-shadow:0 2px 8px rgba(45, 90, 143, 0.1);
+      transition:all 0.3s ease;
+    }
+    .question-box:hover{
+      box-shadow:0 4px 12px rgba(45, 90, 143, 0.15);
+      transform:translateY(-2px);
+    }
+    .question-box .form-group{ margin-bottom:0; }
+    .question-box .form-group label{
+      font-size:15px;
+      font-weight:600;
+      color:#1a365d;
+      margin-bottom:15px;
+    }
+    
+    .section-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .section-number{
+      width:32px;
+      height:32px;
+      background:linear-gradient(135deg, #1a365d 0%, #2d5a8f 100%);
+      color:#fff;
+      border-radius:8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+      font-weight:600;
+      box-shadow:0 4px 12px rgba(26, 54, 93, 0.25);
+      position:relative;
+      flex-shrink:0;
+    }
+    .section-number::after{
+      content:'';
+      position:absolute;
+      inset:-2px;
+      border-radius:10px;
+      padding:2px;
+      background:linear-gradient(135deg, #1a365d, #2d5a8f);
+      -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
+      opacity:0.3;
+    }
+    
+    /* Name row */
+    .name-row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:15px;
+    }
+    .question-box .name-row .form-group{ margin-bottom:0; }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus{ 
+      outline:none; 
+      border:2px solid #2d5a8f;
+      box-shadow:0 0 0 4px rgba(45, 90, 143, 0.25);
+    }
+
+    /* Placeholders */
+    .form-group input::placeholder,
+    .form-group textarea::placeholder{
+      color:#a0aec0;
+      font-style:normal;
+      font-size:14px;
+      font-family:inherit;
+      opacity:1;
+    }
+
+    /* Native toggles */
+    input[type="radio"]{ accent-color:var(--blue-500); }
+    input[type="checkbox"]{ accent-color:var(--blue-500); }
+
+    /* Grids */
+    .radio-group, .checkbox-group{ 
+      display:grid; 
+      grid-template-columns:repeat(auto-fit, minmax(250px,1fr)); 
+      column-gap:17px; 
+      row-gap:4px;
+      margin-top:10px; 
+    }
+
+    .radio-item, .checkbox-item{
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      padding:16px 20px;
+      margin:6px;
+      background:#f7fafc; 
+      border:1px solid #e2e8f0; 
+      border-radius:8px;
+      cursor:pointer; 
+      transition:all .2s ease; 
+      user-select:none; 
+      position:relative;
+      text-align:center;
+      transform-origin:center;
+      min-height:50px;
+      outline:0;
+    }
+    .radio-item:hover, .checkbox-item:hover{ 
+      background:#edf2f7; 
+      border-color:#cbd5e0; 
+      transform:scale(1.05);
+      z-index:10;
+    }
+    .radio-item.selected, .checkbox-item.selected{ 
+      background:#fff; 
+      border:2px solid #2d5a8f; 
+      color:#1a365d;
+      transform:scale(1.05);
+      box-shadow:0 0 0 4px rgba(45, 90, 143, 0.25);
+      z-index:10;
+    }
+    .radio-item:focus{ box-shadow:0 0 0 4px rgba(45, 90, 143, 0.35); }
+
+    /* Disabled radio items */
+    .radio-item.disabled,
+    .radio-item:has(input[disabled]){
+      opacity:0.5;
+      cursor:not-allowed;
+      background:#f5f5f5;
+      color:#999;
+      border-color:#ddd;
+    }
+    .radio-item.disabled:hover,
+    .radio-item:has(input[disabled]):hover{
+      transform:none;
+      background:#f5f5f5;
+      border-color:#ddd;
+      z-index:1;
+    }
+    .radio-item.disabled label,
+    .radio-item:has(input[disabled]) label{
+      cursor:not-allowed;
+      color:#999;
+    }
+
+    /* הסתרת ה-inputs */
+    .radio-item input,
+    .checkbox-item input{ display:none; }
+
+    .radio-item label, .checkbox-item label{
+      width:100%;
+      text-align:center;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin:0;
+      padding:0;
+      line-height:1.5;
+    }
+
+    /* Dynamic sections */
+    .dynamic-section{ display:none; margin-top:25px; padding:20px; background:#f7fafc; border:1px solid #e2e8f0; border-radius:8px; }
+    .dynamic-section .section-title{ font-size:16px; margin-bottom:15px; }
+
+    /* Submit */
+    .submit-section{ text-align:center; padding:30px 0; margin-top:30px; }
+
+    .submit-btn{
+      padding:0.75rem 2rem; 
+      min-width:170px; 
+      font-size:16px; 
+      font-weight:600; 
+      border-radius:12px;
+      cursor:pointer; 
+      border:0; 
+      display:inline-flex; 
+      align-items:center; 
+      justify-content:center;
+      color:#fff;
+      transition:all .3s ease;
+      font-family:inherit;
+      background:linear-gradient(135deg, #1a365d 0%, #2d5a8f 100%);
+      text-transform:uppercase;
+      letter-spacing:1px;
+      box-shadow:0 4px 15px rgba(26, 54, 93, 0.3);
+      position:relative;
+      overflow:hidden;
+    }
+    .submit-btn::before{
+      content:'';
+      position:absolute;
+      top:0;
+      left:-100%;
+      width:100%;
+      height:100%;
+      background:linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition:left 0.7s ease;
+    }
+    .submit-btn:hover::before{ left:100%; }
+    .submit-btn:hover{ transform:translateY(-2px); box-shadow:0 6px 20px rgba(26, 54, 93, 0.4); }
+    .submit-btn:active{ transform:translateY(0); }
+    .submit-btn:disabled{ opacity:0.6; cursor:not-allowed; transform:translateY(0); }
+
+    .submit-info{ margin-top:15px; font-size:14px; color:#666; line-height:1.6; max-width:600px; margin-left:auto; margin-right:auto; }
+
+    /* Success / Error */
+    .success-message{ display:none; text-align:center; padding:60px 40px; animation:fadeInUp 0.5s ease-in-out forwards; }
+    .success-message h2{ color:var(--primary-color); font-size:2rem; margin-bottom:1rem; font-weight:700; }
+    .success-message p{ color:var(--text-light); font-size:16px; line-height:1.6; }
+
+    .error-message{ display:none; text-align:center; padding:60px 40px; background:#fff; }
+    .error-message h2{ color:#e53e3e; font-size:24px; margin-bottom:15px; font-weight:700; }
+    .error-message p{ color:#666; font-size:16px; line-height:1.6; }
+    .error-message button{ margin-top:20px; padding:10px 20px; background:#1a365d; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+
+    /* Footer */
+    .footer{
+      background:var(--primary-color);
+      color:#fff;
+      padding:30px 20px;
+      text-align:center;
+      margin-top:auto;
+      position:relative;
+      z-index:10;
+    }
+
+    body{
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    body > *:not(.footer){
+      flex-shrink:0;
+    }
+    .footer p{ margin-bottom:8px; font-size:15px; line-height:1.6; font-weight:400; letter-spacing:0.2px; }
+    .footer strong{ font-weight:600; }
+
+    /* Responsive */
+    @media (max-width:768px){
+      .header-content{ flex-direction:column; gap:10px; }
+      .hero{ padding:40px 20px; }
+      .hero h1{ font-size:24px; }
+      .form-wrapper{ padding:30px 20px; }
+      .radio-group, .checkbox-group{ grid-template-columns:1fr; }
+      .name-row{ grid-template-columns:1fr; }
+      .success-message{ padding:40px 20px; }
+      .brand-title{ text-align:center; }
+      .progress-wrapper.scrolled{
+        margin-left:10px;
+        margin-right:10px;
+        border-radius:12px;
+        padding:16px 18px;
+      }
+      .progress-bar{ max-width:100%; }
+      .progress-wrapper.scrolled .progress-bar{ max-width:100%; }
+      .answers-grid{ grid-template-columns:1fr; }
+
+      /* Footer mobile layout */
+      .footer-contact{
+        display:flex;
+        flex-direction:column;
+        gap:5px;
+        align-items:center;
+      }
+      .footer-separator{
+        display:none;
+      }
+    }
+    
+    /* Highlight invalid radio groups */
+    .question-box.invalid {
+      border-color:#e53e3e !important;
+      box-shadow:0 0 0 4px rgba(229, 62, 62, 0.25);
+    }
+    .question-box.invalid .radio-item{
+      border-color:#fccccc !important;
+      background:#fff5f5;
+    }
+
+    /* Loading Message */
+    .loading-message{
+      display:none;
+      text-align:center;
+      padding:100px 40px;
+      animation:fadeInUp 0.5s ease-in-out forwards;
+    }
+    .loading-message h2{ color:var(--primary-color); font-size:2rem; margin-bottom:1rem; font-weight:700; }
+    .loading-message p{ color:var(--text-light); font-size:16px; line-height:1.6; margin-top:20px; }
+
+    .loading-spinner{
+      width:60px;
+      height:60px;
+      margin:30px auto;
+      border:6px solid #e2e8f0;
+      border-top-color:var(--secondary-color);
+      border-radius:50%;
+      animation:spin 1s linear infinite;
+    }
+
+    @keyframes spin{
+      to{ transform:rotate(360deg); }
+    }
+
+    /* User Answers Section - Inside Same Card */
+    .user-answers-section{
+      margin-top:60px;
+      padding-top:40px;
+      border-top:3px solid #e2e8f0;
+    }
+    .user-answers-section h3{
+      color:var(--primary-color);
+      font-size:1.5rem;
+      margin-bottom:30px;
+      font-weight:700;
+      text-align:center;
+      padding-bottom:15px;
+      border-bottom:3px solid var(--secondary-color);
+    }
+    .answers-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:20px;
+      margin-top:25px;
+    }
+    .answer-row{
+      background:#f7fafc;
+      padding:20px;
+      border-radius:12px;
+      border:1px solid #e2e8f0;
+      transition:all 0.2s ease;
+    }
+    .answer-row:hover{
+      background:#fff;
+      border-color:#cbd5e0;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      transform:translateY(-2px);
+    }
+    .answer-question{
+      font-weight:600;
+      color:var(--primary-color);
+      font-size:13px;
+      margin-bottom:8px;
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+    }
+    .answer-value{
+      color:var(--text-color);
+      font-size:15px;
+      line-height:1.6;
+      font-weight:500;
+    }
+
+    /* Results Message */
+    .results-message{ display:none; padding:40px; animation:fadeInUp 0.5s ease-in-out forwards; }
+    .results-message h2{ color:var(--primary-color); font-size:1.8rem; margin-bottom:2rem; font-weight:700; text-align:center; }
+
+    .results-section{ margin-bottom:40px; }
+    .results-section h3{
+      color:var(--primary-color);
+      font-size:1.4rem;
+      margin-bottom:20px;
+      padding-bottom:10px;
+      border-bottom:3px solid var(--secondary-color);
+      font-weight:600;
+      text-align:center;
+    }
+
+    .course-table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+      border-radius:12px;
+      overflow:hidden;
+    }
+
+    .course-table thead{
+      background:linear-gradient(135deg, #1a365d 0%, #2d5a8f 100%);
+      color:#fff;
+    }
+
+    .course-table th{
+      padding:16px;
+      text-align:center;
+      font-weight:600;
+      font-size:14px;
+      letter-spacing:0.5px;
+    }
+
+    .course-table td{
+      padding:16px;
+      text-align:center;
+      border-bottom:1px solid #e2e8f0;
+      font-size:14px;
+    }
+
+    .course-table tbody tr:hover{
+      background:#f7fafc;
+      transition:background 0.2s ease;
+    }
+
+    .course-table tbody tr:last-child td{
+      border-bottom:none;
+    }
+
+    .status-badge{
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:20px;
+      font-size:12px;
+      font-weight:600;
+      text-transform:uppercase;
+    }
+
+    .status-recommended{
+      background:#d4edda;
+      color:#155724;
+    }
+
+    .status-qualified{
+      background:#d1ecf1;
+      color:#0c5460;
+    }
+
+    .status-disqualified{
+      background:#f8d7da;
+      color:#721c24;
+    }
+
+    .score-badge{
+      display:inline-block;
+      padding:8px 16px;
+      background:var(--secondary-color);
+      color:#fff;
+      border-radius:8px;
+      font-weight:700;
+      font-size:16px;
+    }
+
+    .reason-text{
+      color:#666;
+      line-height:1.6;
+    }
+
+    .no-courses{
+      text-align:center;
+      padding:40px;
+      color:var(--text-light);
+      font-size:16px;
+    }
+
+    .back-to-form-btn{
+      display:block;
+      margin:60px auto 40px;
+      padding:0.75rem 2.5rem;
+      min-width:250px;
+      font-size:17px;
+      font-weight:700;
+      border-radius:12px;
+      cursor:pointer;
+      border:2px solid var(--primary-color);
+      color:var(--primary-color);
+      background:#fff;
+      transition:all .3s ease;
+      font-family:inherit;
+      text-align:center;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      box-shadow:0 4px 15px rgba(26, 54, 93, 0.2);
+    }
+    .back-to-form-btn:hover{
+      background:var(--primary-color);
+      color:#fff;
+      transform:translateY(-2px);
+      box-shadow:0 6px 20px rgba(26, 54, 93, 0.3);
+    }
+    .back-to-form-btn:active{
+      transform:translateY(0);
+    }
+
+    @keyframes fadeInUp{
+      from{ opacity:0; transform:translateY(20px); }
+      to{ opacity:1; transform:translateY(0); }
+    }
+
+    @media (max-width:768px){
+      .course-table thead{ display:none; }
+      .course-table, .course-table tbody, .course-table tr, .course-table td{
+        display:block;
+        width:100%;
+      }
+      .course-table tr{
+        margin-bottom:20px;
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        padding:16px;
+        background:#fff;
+      }
+      .course-table td{
+        text-align:center;
+        padding:8px 0;
+        border:none;
+      }
+      .course-table td::before{
+        content:attr(data-label);
+        font-weight:600;
+        display:block;
+        margin-bottom:4px;
+        color:var(--primary-color);
+        text-align:center;
+      }
+      .results-message{ padding:20px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-content">
+      <div class="brand-title">בית הספר ללימודי המשך של הטכניון ע"ש עזריאלי</div>
+      <div class="contact-info">073-3785050 מוקד מידע ורישום</div>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-content">
+      <h1>שאלון התאמת קורסים אישי</h1>
+      <p>מלא את הפרטים הבאים ונתאים לך את הקורס המתאים ביותר</p>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="container">
+    <div class="form-wrapper">
+      <div class="progress-wrapper" id="progressWrapper">
+        <div class="progress-text">השלמת השאלון: <span id="progressText">0%</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+
+      <form id="courseForm" novalidate>
+        <!-- פרטים אישיים -->
+        <div class="section">
+          <div class="section-title"><span class="section-number">1</span>פרטים אישיים</div>
+
+          <div class="question-box">
+            <div class="name-row">
+              <div class="form-group">
+                <label for="firstName">שם פרטי <span class="required">*</span></label>
+                <input type="text" id="firstName" name="firstName" required placeholder="דניאל">
+              </div>
+
+              <div class="form-group">
+                <label for="lastName">שם משפחה <span class="required">*</span></label>
+                <input type="text" id="lastName" name="lastName" required placeholder="כהן">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- רקע מקצועי -->
+        <div class="section">
+          <div class="section-title"><span class="section-number">2</span>רקע מקצועי</div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מה רמת ההשכלה שלך? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="edu_high" name="education" value="high_school" required>
+                  <label for="edu_high">תיכונית</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="edu_cert" name="education" value="certificate" required>
+                  <label for="edu_cert">תעודה מקצועית</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="edu_ba" name="education" value="bachelors" required>
+                  <label for="edu_ba">תואר ראשון</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="edu_ma" name="education" value="Masters_degree" required>
+                  <label for="edu_ma">תואר שני ומעלה</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מה תחום העיסוק שלך כיום? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="work_tech" name="current_field" value="technology" required>
+                  <label for="work_tech">טכנולוגיה והייטק</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="work_mgmt" name="current_field" value="management" required>
+                  <label for="work_mgmt">ניהול ועסקים</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="work_edu" name="current_field" value="education" required>
+                  <label for="work_edu">חינוך והוראה</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="work_other" name="current_field" value="other" required>
+                  <label for="work_other">אחר</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label for="experience">שנות ניסיון בתחום <span class="required">*</span></label>
+              <select id="experience" name="experience" required>
+                <option value="">בחר טווח</option>
+                <option value="none">ללא ניסיון</option>
+                <option value="0-2">פחות משנתיים</option>
+                <option value="2-5">2-5 שנים</option>
+                <option value="5-10">5-10 שנים</option>
+                <option value="10+">מעל 10 שנים</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מהי רמת האנגלית שלך? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="english_basic" name="english_level" value="basic" required>
+                  <label for="english_basic">בסיסית</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="english_intermediate" name="english_level" value="intermediate" required>
+                  <label for="english_intermediate">בינונית</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="english_good" name="english_level" value="good" required>
+                  <label for="english_good">טובה</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="english_very_good" name="english_level" value="very_good" required>
+                  <label for="english_very_good">טובה מאוד</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- תחום עניין -->
+        <div class="section">
+          <div class="section-title"><span class="section-number">3</span>תחום עניין להעמקה</div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>באיזה תחום תרצה להתמחות? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="field_data" name="field" value="data" disabled>
+                  <label for="field_data">Data ואנליטיקה (לא זמין)</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="field_ai" name="field" value="computers_and_hitech" required>
+                  <label for="field_ai">מחשבים והייטק</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="field_cyber" name="field" value="cyber" disabled>
+                  <label for="field_cyber">אבטחת מידע (Cyber) (לא זמין)</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="field_pm" name="field" value="pm" disabled>
+                  <label for="field_pm">ניהול מוצר (PM) (לא זמין)</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="field_digital" name="field" value="digital" disabled>
+                  <label for="field_digital">שיווק דיגיטלי (לא זמין)</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="field_business" name="field" value="business" disabled>
+                  <label for="field_business">ניהול עסקי (לא זמין)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- שאלות דינמיות לפי תחום -->
+          <div id="data-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - Data</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>יש לך ניסיון בתכנות? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="data_prog_yes" name="data_programming" value="yes" data-conditional-required="data">
+                    <label for="data_prog_yes">כן</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="data_prog_no" name="data_programming" value="no" data-conditional-required="data">
+                    <label for="data_prog_no">לא</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>מה מעניין אותך יותר? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="data_int_analysis" name="data_interest" value="analysis" data-conditional-required="data">
+                    <label for="data_int_analysis">ניתוח נתונים</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="data_int_ml" name="data_interest" value="machine_learning" data-conditional-required="data">
+                    <label for="data_int_ml">למידת מכונה</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="data_int_bi" name="data_interest" value="bi" data-conditional-required="data">
+                    <label for="data_int_bi">BI וויזואליזציה</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="data_int_none" name="data_interest" value="none" data-conditional-required="data">
+                    <label for="data_int_none">אף אחד</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="ai-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - מחשבים והייטק</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>באיזה תחום תרצה להתמקד? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="ai_int_ai" name="ai_interest" value="artificial_intelligence" data-conditional-required="computers_and_hitech">
+                    <label for="ai_int_ai">בינה מלאכותית (AI)</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="ai_int_data_bi" name="ai_interest" value="data_analyst_and_bi" data-conditional-required="computers_and_hitech">
+                    <label for="ai_int_data_bi">Data Analyst & BI</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="ai_int_web" name="ai_interest" value="web_development" data-conditional-required="computers_and_hitech">
+                    <label for="ai_int_web">בניית אתרים</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="ai_int_software" name="ai_interest" value="software_development" data-conditional-required="computers_and_hitech">
+                    <label for="ai_int_software">בניית תוכנה</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="ai_int_cyber" name="ai_interest" value="cyber_security" data-conditional-required="computers_and_hitech">
+                    <label for="ai_int_cyber">סייבר</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="cyber-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - Cyber</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>יש לך רקע טכני? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="cyber_tech_yes" name="cyber_technical" value="yes" data-conditional-required="cyber">
+                    <label for="cyber_tech_yes">כן</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="cyber_tech_no" name="cyber_technical" value="no" data-conditional-required="cyber">
+                    <label for="cyber_tech_no">לא</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>מה מעניין אותך יותר? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="cyber_int_offensive" name="cyber_interest" value="offensive" data-conditional-required="cyber">
+                    <label for="cyber_int_offensive">Offensive Security</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="cyber_int_defensive" name="cyber_interest" value="defensive" data-conditional-required="cyber">
+                    <label for="cyber_int_defensive">Defensive Security</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="cyber_int_mgmt" name="cyber_interest" value="management" data-conditional-required="cyber">
+                    <label for="cyber_int_mgmt">ניהול אבטחה</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="pm-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - Product Management</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>יש לך ניסיון בפיתוח מוצר? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="pm_exp_yes" name="pm_experience" value="yes" data-conditional-required="pm">
+                    <label for="pm_exp_yes">כן</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="pm_exp_no" name="pm_experience" value="no" data-conditional-required="pm">
+                    <label for="pm_exp_no">לא</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="digital-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - שיווק דיגיטלי</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>באיזה תחום תרצה להתמקד? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="digital_int_social" name="digital_interest" value="social" data-conditional-required="digital">
+                    <label for="digital_int_social">רשתות חברתיות</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="digital_int_seo" name="digital_interest" value="seo" data-conditional-required="digital">
+                    <label for="digital_int_seo">SEO וקידום אתרים</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="digital_int_analytics" name="digital_interest" value="analytics" data-conditional-required="digital">
+                    <label for="digital_int_analytics">Analytics וביצועים</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="business-questions" class="dynamic-section">
+            <div class="section-title">שאלות נוספות - ניהול עסקי</div>
+            <div class="question-box">
+              <div class="form-group">
+                <label>מה מעניין אותך יותר? <span class="required">*</span></label>
+                <div class="radio-group">
+                  <div class="radio-item">
+                    <input type="radio" id="business_int_strategy" name="business_interest" value="strategy" data-conditional-required="business">
+                    <label for="business_int_strategy">אסטרטגיה עסקית</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="business_int_finance" name="business_interest" value="finance" data-conditional-required="business">
+                    <label for="business_int_finance">ניהול כספי</label>
+                  </div>
+                  <div class="radio-item">
+                    <input type="radio" id="business_int_hr" name="business_interest" value="hr" data-conditional-required="business">
+                    <label for="business_int_hr">ניהול משאבי אנוש</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- העדפות לימוד -->
+        <div class="section">
+          <div class="section-title"><span class="section-number">4</span>העדפות לימוד</div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מהי צורת הלימוד המועדפת עליך? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="mode_frontal" name="study_mode" value="frontal_in_class" required>
+                  <label for="mode_frontal">פרונטלי בכיתה</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="mode_hybrid" name="study_mode" value="hybrid_learning" required>
+                  <label for="mode_hybrid">היברידי</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מתי תרצה להתחיל? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="start_asap" name="start_time" value="asap" required>
+                  <label for="start_asap">בהקדם</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="start_month" name="start_time" value="next_month" required>
+                  <label for="start_month">בחודש הקרוב</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="start_quarter" name="start_time" value="in_three_months" required>
+                  <label for="start_quarter">בשלושה חודשים</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="start_flexible" name="start_time" value="flexible" required>
+                  <label for="start_flexible">גמיש</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>קמפוס מועדף? <span class="required">*</span></label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="campus_sharona" name="preferred_campus" value="sharona" required>
+                  <label for="campus_sharona">שרונה</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="campus_haifa" name="preferred_campus" value="haifa" required>
+                  <label for="campus_haifa">חיפה</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="campus_flexible" name="preferred_campus" value="flexible" required>
+                  <label for="campus_flexible">גמיש</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <div class="form-group">
+              <label>מטרות מהקורס (ניתן לבחור כמה אפשרויות) <span class="required">*</span></label>
+              <div class="checkbox-group" id="goalsGroup">
+                <div class="checkbox-item">
+                  <input type="checkbox" id="goal_career" name="goals" value="career_change">
+                  <label for="goal_career">שינוי קריירה</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="goal_upgrade" name="goals" value="professional_upgrade">
+                  <label for="goal_upgrade">שדרוג מקצועי</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="goal_business" name="goals" value="business_development">
+                  <label for="goal_business">פיתוח עסק</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="goal_personal" name="goals" value="personal_enrichment">
+                  <label for="goal_personal">העשרה אישית</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- הערות נוספות -->
+        <div class="section">
+          <div class="section-title"><span class="section-number">5</span>הערות נוספות</div>
+          <div class="question-box">
+            <div class="form-group">
+              <label for="comments">כתבו כאן כל דבר שחשוב שנדע</label>
+              <textarea id="comments" name="comments" placeholder="למשל: אילוצי זמנים, רקע מקצועי, שאלות"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- שליחה -->
+        <div class="submit-section">
+          <button type="submit" class="submit-btn" id="submitBtn">שליחה</button>
+          <div class="submit-info">לאחר השליחה, תופנה לאתר ובו טבלה הכוללת המלצות על קורסים מותאמים אישית, כולל הסברים מדוע הם הכי מתאימים עבורך.</div>
+        </div>
+      </form>
+    </div>
+
+    <!-- מסך טעינה -->
+    <div id="loadingMessage" class="loading-message">
+      <h2>מחפש קורסים מתאימים...</h2>
+      <div class="loading-spinner"></div>
+      <p>אנא המתן, אנחנו מנתחים את הנתונים שמילאת ומחפשים את הקורסים המתאימים ביותר עבורך</p>
+    </div>
+
+    <!-- תוצאות -->
+    <div id="resultsMessage" class="results-message">
+      <h2>תוצאות הטופס</h2>
+      <div id="resultsContent"></div>
+    </div>
+
+    <!-- הודעת שגיאה -->
+    <div id="errorMessage" class="error-message">
+      <h2>אופס, משהו השתבש</h2>
+      <p>לא הצלחנו לשלוח את השאלון. אנא נסה שוב או צור איתנו קשר ישירות.</p>
+      <button onclick="window.location.reload()">נסה שוב</button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p><strong>בית הספר ללימודי המשך - הטכניון</strong></p>
+    <p class="footer-contact">
+      <span class="footer-phone">מוקד מידע ורישום: 073-3785050</span>
+      <span class="footer-separator"> | </span>
+      <span class="footer-email">cont-ed@technion.ac.il</span>
+    </p>
+  </div>
+
+<script>
+ const WEBHOOK_URL = '/api/match-courses';
+
+  // משתנה גלובלי לשמירת שם המשתמש
+  let userFullName = '';
+
+  // לא רוצים וולידציה מובנית של required על radios מוסתרים
+  document.querySelectorAll('input[type="radio"][required]').forEach(r => r.removeAttribute('required'));
+
+  // כללי עזר לסימון, גלילה ופוקוס
+  function qBoxBy(el){ return el ? el.closest('.question-box') : null; }
+  function qBoxByGroup(name){
+    const el = document.querySelector(`input[type="radio"][name="${name}"]`);
+    return qBoxBy(el);
+  }
+  function markInvalidBox(box, groupSelector){
+    if (!box) return;
+    box.classList.add('invalid');
+    // הסר הדגשה כשיש שינוי
+    if (groupSelector){
+      document.querySelectorAll(groupSelector).forEach(el => {
+        el.addEventListener('input', () => box.classList.remove('invalid'), { once:true });
+        el.addEventListener('change', () => box.classList.remove('invalid'), { once:true });
+      });
+    }
+  }
+  function scrollToBox(box){ if (box) box.scrollIntoView({ behavior:'smooth', block:'center' }); }
+
+  // החזרת התנהגות tiles
+  document.addEventListener('click', function(e){
+    const tile = e.target.closest('.radio-item, .checkbox-item');
+    if (!tile) return;
+    const input = tile.querySelector('input');
+    if (!input || input.disabled) return;
+    if (input.type === 'radio'){
+      if (!input.checked){
+        input.checked = true;
+        input.dispatchEvent(new Event('change', { bubbles:true }));
+      }
+    }else{
+      input.checked = !input.checked;
+      input.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+  });
+
+  // מיפוי שאלות דינמיות לפי תחום
+  const CONDITIONAL_BY_FIELD = {
+    data:     [{ name:'data_programming', msg:'לא נבחרה תשובה - ידע בתכנות' },
+               { name:'data_interest',    msg:'לא נבחר תחום עניין בדאטה' }],
+    ai:       [{ name:'ai_interest',      msg:'לא נבחר תחום עניין בבינה מלאכותית' }],
+    cyber:    [{ name:'cyber_technical',  msg:'לא נבחרה תשובה - רקע טכני' },
+               { name:'cyber_interest',   msg:'לא נבחר תחום עניין באבטחת מידע' }],
+    pm:       [{ name:'pm_experience',    msg:'לא נבחרה רמת ניסיון בניהול מוצר' }],
+    digital:  [{ name:'digital_interest', msg:'לא נבחר תחום להתמקדות בשיווק דיגיטלי' }],
+    business: [{ name:'business_interest',msg:'לא נבחר תחום עניין בניהול עסקי' }],
+  };
+
+ async function validateInOrder(){
+  // עוזרים
+  const firstChecked = name => document.querySelector(`input[name="${name}"]:checked`);
+  const isGroupChecked = name => !!firstChecked(name);
+
+  const firstName = document.getElementById('firstName');
+  if (!firstName || firstName.value.trim() === ''){
+    const box = firstName.closest('.question-box');
+    markInvalidBox(box, '#firstName');
+    scrollToBox(box);
+    alert('לא הוזן שם פרטי');
+    firstName.focus({ preventScroll:true });
+    return false;
+  }
+
+  const lastName = document.getElementById('lastName');
+  if (!lastName || lastName.value.trim() === ''){
+    const box = lastName.closest('.question-box');
+    markInvalidBox(box, '#lastName');
+    scrollToBox(box);
+    alert('לא הוזן שם משפחה');
+    lastName.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (!isGroupChecked('education')){
+    const box = qBoxByGroup('education');
+    markInvalidBox(box, 'input[name="education"]');
+    scrollToBox(box);
+    alert('לא נבחרה רמת השכלה');
+    document.querySelector('input[name="education"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (!isGroupChecked('current_field')){
+    const box = qBoxByGroup('current_field');
+    markInvalidBox(box, 'input[name="current_field"]');
+    scrollToBox(box);
+    alert('לא נבחר תחום עיסוק נוכחי');
+    document.querySelector('input[name="current_field"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  const experience = document.getElementById('experience');
+  if (!experience || !experience.value){
+    const box = experience.closest('.question-box');
+    markInvalidBox(box, '#experience');
+    scrollToBox(box);
+    alert('לא נבחר טווח שנות ניסיון');
+    experience.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (!isGroupChecked('english_level')){
+    const box = qBoxByGroup('english_level');
+    markInvalidBox(box, 'input[name="english_level"]');
+    scrollToBox(box);
+    alert('לא נבחרה רמת אנגלית');
+    document.querySelector('input[name="english_level"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  const fieldChosen = firstChecked('field');
+  if (!fieldChosen){
+    const box = qBoxByGroup('field');
+    markInvalidBox(box, 'input[name="field"]');
+    scrollToBox(box);
+    alert('לא נבחר תחום עניין להעמקה');
+    document.querySelector('input[name="field"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  // ----- כאן הקטע הקריטי: לפתוח את מקטע השאלות הדינמיות ואז לבדוק -----
+  const fieldVal = fieldChosen.value;
+  if (typeof showDynamicForField === 'function') {
+    showDynamicForField(fieldVal);      // פותח את המקטע הנכון
+  }
+  await new Promise(r => requestAnimationFrame(r)); // נותן לדפדפן “טיק” לרנדר
+
+  const COND = {
+    data: [
+      { name:'data_programming', msg:'לא נבחרה תשובה - ידע בתכנות' },
+      { name:'data_interest',    msg:'לא נבחר תחום עניין בדאטה' }
+    ],
+    ai: [
+      { name:'ai_interest',      msg:'לא נבחר תחום עניין בבינה מלאכותית' }
+    ],
+    cyber: [
+      { name:'cyber_technical',  msg:'לא נבחרה תשובה - רקע טכני' },
+      { name:'cyber_interest',   msg:'לא נבחר תחום עניין באבטחת מידע' }
+    ],
+    pm: [
+      { name:'pm_experience',    msg:'לא נבחרה רמת ניסיון בניהול מוצר' }
+    ],
+    digital: [
+      { name:'digital_interest', msg:'לא נבחר תחום להתמקדות בשיווק דיגיטלי' }
+    ],
+    business: [
+      { name:'business_interest',msg:'לא נבחר תחום עניין בניהול עסקי' }
+    ]
+  };
+
+  for (const g of (COND[fieldVal] || [])) {
+    if (!isGroupChecked(g.name)){
+      const box = qBoxByGroup(g.name);
+      markInvalidBox(box, `input[name="${g.name}"]`);
+      scrollToBox(box);
+      alert(g.msg);
+      document.querySelector(`input[name="${g.name}"]`)?.focus({ preventScroll:true });
+      return false;
+    }
+  }
+  // ----------------------------------------------------------------------
+
+  if (!isGroupChecked('study_mode')){
+    const box = qBoxByGroup('study_mode');
+    markInvalidBox(box, 'input[name="study_mode"]');
+    scrollToBox(box);
+    alert('לא נבחרה צורת לימוד');
+    document.querySelector('input[name="study_mode"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (!isGroupChecked('start_time')){
+    const box = qBoxByGroup('start_time');
+    markInvalidBox(box, 'input[name="start_time"]');
+    scrollToBox(box);
+    alert('לא נבחר מועד התחלה');
+    document.querySelector('input[name="start_time"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (!isGroupChecked('preferred_campus')){
+    const box = qBoxByGroup('preferred_campus');
+    markInvalidBox(box, 'input[name="preferred_campus"]');
+    scrollToBox(box);
+    alert('לא נבחר קמפוס מועדף');
+    document.querySelector('input[name="preferred_campus"]')?.focus({ preventScroll:true });
+    return false;
+  }
+
+  if (document.querySelectorAll('input[name="goals"]:checked').length === 0){
+    const box = qBoxBy(document.getElementById('goalsGroup'));
+    markInvalidBox(box, 'input[name="goals"]');
+    scrollToBox(box);
+    alert('לא נבחרה לפחות מטרה אחת מהקורס');
+    return false;
+  }
+
+  // Comments are now optional - no validation needed
+
+  return true;
+}
+
+  // פונקציה לסינון תשובות דינמיות שאינן רלוונטיות
+  function filterConditionalAnswers(data) {
+    const selectedField = data.field;
+    if (!selectedField) return data;
+
+    const CONDITIONAL_BY_FIELD = {
+      data: ['data_programming', 'data_interest'],
+      computers_and_hitech: ['ai_interest'],
+      cyber: ['cyber_technical', 'cyber_interest'],
+      pm: ['pm_experience'],
+      digital: ['digital_interest'],
+      business: ['business_interest']
+    };
+
+    // מחק תשובות מכל התחומים שלא נבחרו
+    Object.keys(CONDITIONAL_BY_FIELD).forEach(field => {
+      if (field !== selectedField) {
+        CONDITIONAL_BY_FIELD[field].forEach(questionName => {
+          delete data[questionName];
+        });
+      }
+    });
+
+    return data;
+  }
+
+  // שליחה
+  document.getElementById('courseForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+
+    // לפי סדר
+    const ok = await validateInOrder();
+    if (!ok) return;
+
+    // שליחה ל-
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.textContent = 'שולח...';
+    submitBtn.disabled = true;
+
+    const formData = new FormData(this);
+    const data = {};
+    for (const [k,v] of formData.entries()){
+      if (data[k]) Array.isArray(data[k]) ? data[k].push(v) : data[k] = [data[k], v];
+      else data[k] = v;
+    }
+    
+    // FIX: Convert goals array to comma-separated string for database storage
+    if (Array.isArray(data.goals)) {
+      data.goals = data.goals.join(',');
+    }
+    data.submittedAt = new Date().toISOString();
+    data.submittedAtLocal = new Date().toLocaleString('he-IL');
+    data.fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+
+    // שמור את שם המשתמש למשתנה גלובלי לשימוש מאוחר יותר
+    userFullName = data.fullName;
+
+    // עדכן את מסך הטעינה עם שם המשתמש
+    const loadingMessage = document.getElementById('loadingMessage');
+    const loadingTitle = loadingMessage.querySelector('h2');
+    if (loadingTitle) {
+      loadingTitle.textContent = `מחפש קורסים עבור ${data.firstName} ${data.lastName}...`;
+    }
+
+    // הצג מסך טעינה והסתר hero
+    document.querySelector('.form-wrapper').style.display = 'none';
+    document.querySelector('.hero').style.display = 'none';
+    loadingMessage.style.display = 'block';
+
+    // סנן תשובות דינמיות לא רלוונטיות לפני שליחה
+    const filteredData = filterConditionalAnswers(data);
+
+    try{
+      const res = await fetch(WEBHOOK_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify(filteredData)
+      });
+
+      if (res.ok){
+        let responseData;
+        const contentType = res.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await res.json();
+        } else {
+          const text = await res.text();
+          console.log('Raw response text:', text);
+          try {
+            responseData = JSON.parse(text);
+          } catch (e) {
+            console.error('Failed to parse response:', e);
+            throw new Error('Invalid JSON response');
+          }
+        }
+
+        console.log('Response from webhook:', responseData);
+        console.log('Response type:', typeof responseData);
+        console.log('Is Array:', Array.isArray(responseData));
+
+        // הסתר מסך טעינה
+        document.getElementById('loadingMessage').style.display = 'none';
+
+        // הצג תוצאות
+        displayResults(responseData);
+        document.getElementById('resultsMessage').style.display = 'block';
+      }else{
+        console.error('Server returned error:', res.status, res.statusText);
+        throw new Error('Server error');
+      }
+    }catch(err){
+      console.error('Error submitting form:', err);
+      document.getElementById('loadingMessage').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'block';
+    }finally{
+      submitBtn.textContent = 'שליחה';
+      submitBtn.disabled = false;
+    }
+  });
+
+  // פונקציה להצגת תוצאות
+  function displayResults(responseData) {
+    const resultsContent = document.getElementById('resultsContent');
+    const heroSection = document.querySelector('.hero');
+    const resultsMessage = document.getElementById('resultsMessage');
+
+    // עדכן את כותרת התוצאות עם שם המשתמש
+    const resultsHeading = resultsMessage.querySelector('h2');
+    if (resultsHeading && userFullName) {
+      resultsHeading.textContent = `תוצאות השאלון`;
+    }
+
+    console.log('displayResults called with:', responseData);
+
+    // Helper function to clean JSON from code blocks
+    function cleanJsonString(str) {
+      if (typeof str !== 'string') return str;
+      // Remove ```json and ``` markers if present
+      return str.replace(/^```json\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+    }
+
+    // Parse the response - handle different formats from n8n
+    let results;
+    try {
+      if (Array.isArray(responseData) && responseData.length > 0) {
+        // If it's an array with an "output" field
+        if (responseData[0]?.output) {
+          console.log('Parsing output field:', responseData[0].output);
+          const cleanedOutput = cleanJsonString(responseData[0].output);
+          results = JSON.parse(cleanedOutput);
+        } else {
+          results = responseData[0];
+        }
+      } else if (typeof responseData === 'string') {
+        console.log('Parsing string response');
+        const cleanedString = cleanJsonString(responseData);
+        results = JSON.parse(cleanedString);
+      } else if (responseData?.output) {
+        console.log('Parsing output field from object');
+        const cleanedOutput = cleanJsonString(responseData.output);
+        results = JSON.parse(cleanedOutput);
+      } else {
+        results = responseData;
+      }
+
+      console.log('Parsed results:', results);
+    } catch (error) {
+      console.error('Error parsing results:', error);
+      resultsContent.innerHTML = '<div class="no-courses">שגיאה בעיבוד התוצאות. אנא נסה שוב.</div>';
+      return;
+    }
+
+    // Hide hero section when showing results
+    if (heroSection) {
+      heroSection.style.display = 'none';
+    }
+
+    let html = '';
+
+    // Check if new format with "results" array (Hebrew column names)
+    if (results.results && Array.isArray(results.results)) {
+      console.log('Using new format with Hebrew column names');
+
+      // Sort by score (ציון התאמה) descending
+      const sortedResults = [...results.results].sort((a, b) => {
+        const scoreA = parseInt(a['ציון התאמה']) || 0;
+        const scoreB = parseInt(b['ציון התאמה']) || 0;
+        return scoreB - scoreA;
+      });
+
+      // Separate courses with score > 0 from disqualified (score = 0)
+      const qualifiedCourses = sortedResults.filter(c => parseInt(c['ציון התאמה']) > 0);
+      const disqualifiedCourses = sortedResults.filter(c => parseInt(c['ציון התאמה']) === 0);
+
+      // Display top courses (score > 0)
+      if (qualifiedCourses.length > 0) {
+        const userName = userFullName ? ` עבור ${userFullName}` : ' עבורך';
+        html += `
+          <div class="results-section">
+            <h3>הקורסים המומלצים ביותר${userName} 🏆</h3>
+            <table class="course-table">
+              <thead>
+                <tr>
+                  <th>שם הקורס</th>
+                  <th>ציון התאמה</th>
+                  <th>תאריך התחלה</th>
+                  <th>קמפוס</th>
+                  <th>נימוק</th>
+                  <th>לינק לעמוד התכנית</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        qualifiedCourses.forEach(course => {
+          const score = parseInt(course['ציון התאמה']) || 0;
+          const scoreColor = score > 75 ? '#28a745' : 'var(--secondary-color)';
+          html += `
+            <tr>
+              <td data-label="שם הקורס"><strong>${course['שם הקורס'] || 'לא צוין'}</strong></td>
+              <td data-label="ציון התאמה"><span class="score-badge" style="background:${scoreColor};">${course['ציון התאמה'] || '0'}</span></td>
+              <td data-label="תאריך התחלה">${course['תאריך התחלה'] || 'לא צוין'}</td>
+              <td data-label="קמפוס">${course['קמפוס'] || 'לא צוין'}</td>
+              <td data-label="נימוק"><span class="reason-text">${course['נימוק'] || ''}</span></td>
+              <td data-label="לינק לעמוד התכנית">${course['לינק לעמוד התכנית'] ? `<a href="${course['לינק לעמוד התכנית']}" target="_blank" style="color:#1a365d; font-weight:600;">לפרטים נוספים</a>` : 'לא זמין'}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      // Display disqualified courses
+      if (disqualifiedCourses.length > 0) {
+        html += `
+          <div class="results-section">
+            <h3>קורסים שנפסלו ❌</h3>
+            <table class="course-table">
+              <thead>
+                <tr>
+                  <th>שם הקורס</th>
+                  <th>ציון התאמה</th>
+                  <th>תאריך התחלה</th>
+                  <th>קמפוס</th>
+                  <th>נימוק</th>
+                  <th>לינק לעמוד התכנית</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        disqualifiedCourses.forEach(course => {
+          html += `
+            <tr>
+              <td data-label="שם הקורס"><strong>${course['שם הקורס'] || 'לא צוין'}</strong></td>
+              <td data-label="ציון התאמה"><span class="score-badge" style="background:#dc3545; color:#fff;">0</span></td>
+              <td data-label="תאריך התחלה">${course['תאריך התחלה'] || 'לא צוין'}</td>
+              <td data-label="קמפוס">${course['קמפוס'] || 'לא צוין'}</td>
+              <td data-label="נימוק"><span class="reason-text">${course['נימוק'] || ''}</span></td>
+              <td data-label="לינק לעמוד התכנית">${course['לינק לעמוד התכנית'] ? `<a href="${course['לינק לעמוד התכנית']}" target="_blank" style="color:#1a365d; font-weight:600;">לפרטים נוספים</a>` : 'לא זמין'}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      // If no courses at all
+      if (qualifiedCourses.length === 0 && disqualifiedCourses.length === 0) {
+        html = '<div class="no-courses">לא נמצאו קורסים מתאימים כרגע. נציג יצור איתך קשר בקרוב.</div>';
+      }
+    }
+    // Handle old format with top3/others
+    else if (results.top3 || results.others) {
+      console.log('Using old format with top3/others');
+
+      // הצג TOP 3 אם קיימים
+      if (results.top3 && results.top3.length > 0) {
+        html += `
+          <div class="results-section">
+            <h3>3 הקורסים המומלצים ביותר עבורך 🏆</h3>
+            <table class="course-table">
+              <thead>
+                <tr>
+                  <th>שם הקורס</th>
+                  <th>ציון התאמה</th>
+                  <th>תאריך התחלה</th>
+                  <th>קמפוס</th>
+                  <th>נימוק</th>
+                  <th>לינק לעמוד התכנית</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        results.top3.forEach(course => {
+          const score = parseInt(course.score) || 0;
+          const scoreColor = score > 75 ? '#28a745' : 'var(--secondary-color)';
+          html += `
+            <tr>
+              <td data-label="שם הקורס"><strong>${course.name}</strong></td>
+              <td data-label="ציון התאמה"><span class="score-badge" style="background:${scoreColor};">${course.score}</span></td>
+              <td data-label="תאריך התחלה">${course.start || 'לא צוין'}</td>
+              <td data-label="קמפוס">${course.campus || 'לא צוין'}</td>
+              <td data-label="נימוק"><span class="reason-text">${course.reason}</span></td>
+              <td data-label="לינק לעמוד התכנית">${course.link ? `<a href="${course.link}" target="_blank" style="color:#1a365d; font-weight:600;">לפרטים נוספים</a>` : 'לא זמין'}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      // הצג קורסים אחרים אם קיימים
+      if (results.others && results.others.length > 0) {
+        html += `
+          <div class="results-section">
+            <h3>קורסים נוספים שנבדקו 📚</h3>
+            <table class="course-table">
+              <thead>
+                <tr>
+                  <th>שם הקורס</th>
+                  <th>סטטוס</th>
+                  <th>ציון התאמה</th>
+                  <th>נימוק</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        results.others.forEach(course => {
+          const statusClass = course.status === 'disqualified' ? 'status-disqualified' :
+                             course.status === 'not_selected' ? 'status-qualified' :
+                             'status-recommended';
+          const statusText = course.status === 'disqualified' ? 'נפסל' :
+                            course.status === 'not_selected' ? 'לא נבחר' :
+                            'מתאים';
+
+          html += `
+            <tr>
+              <td data-label="שם הקורס"><strong>${course.name}</strong></td>
+              <td data-label="סטטוס"><span class="status-badge ${statusClass}">${statusText}</span></td>
+              <td data-label="ציון התאמה"><span class="score-badge">${course.score}</span></td>
+              <td data-label="נימוק"><span class="reason-text">${course.reason}</span></td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      // אם אין תוצאות כלל
+      if ((!results.top3 || results.top3.length === 0) && (!results.others || results.others.length === 0)) {
+        html = '<div class="no-courses">לא נמצאו קורסים מתאימים כרגע. נציג יצור איתך קשר בקרוב.</div>';
+      }
+    } else {
+      // Unknown format
+      html = '<div class="no-courses">לא נמצאו קורסים מתאימים כרגע. נציג יצור איתך קשר בקרוב.</div>';
+    }
+
+    // הוסף סקציה של תשובות המשתמש
+    html += generateUserAnswersSection();
+
+    // הוסף כפתור למילוי טופס חדש
+    html += '<button class="back-to-form-btn" onclick="window.location.reload()">מילוי טופס חדש</button>';
+
+    resultsContent.innerHTML = html;
+  }
+
+  // פונקציה ליצירת סקציה של תשובות המשתמש
+  function generateUserAnswersSection() {
+    const form = document.getElementById('courseForm');
+    if (!form) return '';
+
+    const formData = new FormData(form);
+    const answers = [];
+
+    // מיפוי שאלות לכותרות בעברית
+    const questionLabels = {
+      education: 'רמת השכלה',
+      current_field: 'תחום עיסוק',
+      experience: 'שנות ניסיון',
+      english_level: 'רמת אנגלית',
+      field: 'תחום עניין',
+      data_programming: 'ידע בתכנות',
+      data_interest: 'עניין בדאטה',
+      ai_interest: 'התמחות מחשבים',
+      cyber_technical: 'רקע טכני',
+      cyber_interest: 'עניין בסייבר',
+      pm_experience: 'ניסיון ב-PM',
+      digital_interest: 'תחום שיווק דיגיטלי',
+      business_interest: 'עניין בניהול עסקי',
+      study_mode: 'צורת לימוד',
+      start_time: 'מועד התחלה',
+      preferred_campus: 'קמפוס מועדף',
+      goals: 'מטרות מהקורס',
+      comments: 'הערות נוספות'
+    };
+
+    // מיפוי ערכים לטקסט בעברית
+    const valueLabels = {
+      // השכלה
+      high_school: 'תיכונית',
+      certificate: 'תעודה מקצועית',
+      bachelors: 'תואר ראשון',
+      Masters_degree: 'תואר שני ומעלה',
+      // תחום עיסוק
+      technology: 'טכנולוגיה והייטק',
+      management: 'ניהול ועסקים',
+      education: 'חינוך והוראה',
+      other: 'אחר',
+      // ניסיון
+      none: 'ללא ניסיון',
+      '0-2': 'פחות משנתיים',
+      '2-5': '2-5 שנים',
+      '5-10': '5-10 שנים',
+      '10+': 'מעל 10 שנים',
+      // אנגלית
+      basic: 'בסיסית',
+      intermediate: 'בינונית',
+      good: 'טובה',
+      very_good: 'טובה מאוד',
+      // תחומי עניין
+      data: 'Data ואנליטיקה',
+      computers_and_hitech: 'מחשבים והייטק',
+      cyber: 'אבטחת מידע (Cyber)',
+      pm: 'ניהול מוצר (PM)',
+      digital: 'שיווק דיגיטלי',
+      business: 'ניהול עסקי',
+      // תשובות כן/לא
+      yes: 'כן',
+      no: 'לא',
+      // תחומי עניין ספציפיים - Data
+      analysis: 'ניתוח נתונים',
+      machine_learning: 'למידת מכונה',
+      bi: 'BI וויזואליזציה',
+      // תחומי עניין ספציפיים - מחשבים והייטק
+      artificial_intelligence: 'בינה מלאכותית (AI)',
+      data_analyst_and_bi: 'Data Analyst & BI',
+      web_development: 'בניית אתרים',
+      software_development: 'בניית תוכנה',
+      cyber_security: 'סייבר',
+      offensive: 'Offensive Security',
+      defensive: 'Defensive Security',
+      social: 'רשתות חברתיות',
+      seo: 'SEO וקידום אתרים',
+      analytics: 'Analytics וביצועים',
+      finance: 'ניהול כספי',
+      hr: 'ניהול משאבי אנוש',
+      // צורת לימוד
+      frontal_in_class: 'פרונטלי בכיתה',
+      online: 'אונליין',
+      hybrid_learning: 'היברידי',
+      // מועדי התחלה
+      asap: 'בהקדם',
+      next_month: 'בחודש הקרוב',
+      in_three_months: 'בשלושה חודשים',
+      flexible: 'גמיש',
+      // קמפוסים
+      sharona: 'שרונה',
+      haifa: 'חיפה',
+      // מטרות
+      career_change: 'שינוי קריירה',
+      professional_upgrade: 'שדרוג מקצועי',
+      business_development: 'פיתוח עסק',
+      personal_enrichment: 'העשרה אישית'
+    };
+
+    // קבל את התחום הנבחר לצורך סינון שאלות דינמיות
+    const selectedField = formData.get('field');
+    const CONDITIONAL_BY_FIELD = {
+      data: ['data_programming', 'data_interest'],
+      computers_and_hitech: ['ai_interest'],
+      cyber: ['cyber_technical', 'cyber_interest'],
+      pm: ['pm_experience'],
+      digital: ['digital_interest'],
+      business: ['business_interest']
+    };
+
+    // בנה רשימה של שאלות מותנות מותרות
+    const allowedConditionals = selectedField ? CONDITIONAL_BY_FIELD[selectedField] || [] : [];
+    const allConditionals = Object.values(CONDITIONAL_BY_FIELD).flat();
+
+    // אסוף את כל התשובות
+    for (const [key, value] of formData.entries()) {
+      if (!value || !questionLabels[key]) continue;
+
+      // דלג על שאלות דינמיות שלא שייכות לתחום הנבחר
+      const isConditional = allConditionals.includes(key);
+      if (isConditional && !allowedConditionals.includes(key)) continue;
+
+      const question = questionLabels[key];
+      let answer = value;
+
+      // המר ערכים לעברית
+      if (valueLabels[value]) {
+        answer = valueLabels[value];
+      }
+
+      // טיפול במטרות (מרובות)
+      if (key === 'goals') {
+        const existingGoals = answers.find(a => a.question === question);
+        if (existingGoals) {
+          existingGoals.answer += ', ' + answer;
+        } else {
+          answers.push({ question, answer });
+        }
+      } else {
+        answers.push({ question, answer });
+      }
+    }
+
+    // בנה את ה-HTML
+    if (answers.length === 0) return '';
+
+    let answersHtml = `
+      <div class="user-answers-section">
+        <h3>נתוני המועמד</h3>
+        <div class="answers-grid">
+    `;
+
+    answers.forEach(({ question, answer }) => {
+      answersHtml += `
+        <div class="answer-row">
+          <div class="answer-question">${question}</div>
+          <div class="answer-value">${answer}</div>
+        </div>
+      `;
+    });
+
+    answersHtml += `
+        </div>
+      </div>
+    `;
+
+    return answersHtml;
+  }
+
+  // אם יש לך updateProgress קיים - תשמור עליו
+  if (typeof updateProgress === 'function') updateProgress();
+</script>
+  <script>
+  // סימון tiles לרדיו - כולל הסרת selected מקבוצת הרדיו
+  function wireRadioTiles(){
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', function(){
+        const group = this.name;
+        document.querySelectorAll(`input[name="${group}"]`).forEach(r => {
+          r.closest('.radio-item')?.classList.remove('selected');
+        });
+        this.closest('.radio-item')?.classList.add('selected');
+        if (typeof updateProgress === 'function') updateProgress();
+      });
+    });
+  }
+
+  // סימון tiles לצ'קבוקסים
+  function wireCheckboxTiles(){
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', function(){
+        this.closest('.checkbox-item')?.classList.toggle('selected', this.checked);
+        if (typeof updateProgress === 'function') updateProgress();
+      });
+    });
+  }
+
+  // עדכון progress על כל שינוי בקלטים
+  document.addEventListener('change', function(e){
+    if (e.target.matches('input, select, textarea')){
+      if (typeof updateProgress === 'function') updateProgress();
+    }
+  });
+  document.addEventListener('input', function(e){
+    if (e.target.matches('input, select, textarea')){
+      if (typeof updateProgress === 'function') updateProgress();
+    }
+  });
+
+  // קריאה ראשונית לחיווט
+  wireRadioTiles();
+  wireCheckboxTiles();
+  if (typeof updateProgress === 'function') updateProgress();
+</script>
+  <script>
+  // Sticky progress bar animation - מחזיר את המחלקה scrolled בזמן גלילה
+  const progressWrapper = document.getElementById('progressWrapper');
+  if (progressWrapper){
+    const sentinel = document.createElement('div');
+    sentinel.style.height = '1px';
+    sentinel.style.position = 'absolute';
+    sentinel.style.top = '0';
+    sentinel.style.width = '100%';
+    progressWrapper.parentElement.insertBefore(sentinel, progressWrapper);
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          progressWrapper.classList.add('scrolled');
+        } else {
+          progressWrapper.classList.remove('scrolled');
+        }
+      },
+      { threshold:0, rootMargin:'-20px 0px 0px 0px' }
+    );
+    observer.observe(sentinel);
+  }
+</script>
+  
+  <script>
+  // מיפוי ערך תחום -> מזהה מקטע השאלות
+  const FIELD_TO_SECTION_ID = {
+    data: 'data-questions',
+    computers_and_hitech: 'ai-questions',
+    cyber: 'cyber-questions',
+    pm: 'pm-questions',
+    digital: 'digital-questions',
+    business: 'business-questions'
+  };
+
+  function showDynamicForField(fieldValue, skipProgressUpdate = false){
+    // הסתר הכל
+    document.querySelectorAll('.dynamic-section').forEach(s => { s.style.display = 'none'; });
+    // הצג רק את התואם
+    const id = FIELD_TO_SECTION_ID[fieldValue];
+    if (id){
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'block';
+    }
+    if (!skipProgressUpdate && typeof updateProgress === 'function') updateProgress();
+  }
+
+  // מאזינים לשינוי תחום - מציגים את המקטע
+  document.querySelectorAll('input[name="field"]').forEach(r => {
+    r.addEventListener('change', function(){
+      showDynamicForField(this.value);
+    });
+  });
+
+  // בהטענה ראשונית - אם כבר נבחר תחום, הצג את המקטע שלו
+  document.addEventListener('DOMContentLoaded', () => {
+    const chosen = document.querySelector('input[name="field"]:checked');
+    if (chosen) showDynamicForField(chosen.value);
+    if (typeof updateProgress === 'function') updateProgress();
+  });
+
+  // חיזוק לולידציה בסדר - אם חסרות שאלות נוספות, נפתח את המקטע לפני ההתראה
+  // קרא לפונקציה הזו מתוך validateInOrder שלך לפני בדיקת השאלות הדינמיות:
+  //   const fieldChosen = document.querySelector('input[name="field"]:checked');
+  //   if (fieldChosen) showDynamicForField(fieldChosen.value);
+</script>
+<script>
+  // חישוב התקדמות הטופס + עדכון ה-Progress Bar
+  function updateProgress() {
+    const checks = [];
+
+    // פרטים אישיים
+    checks.push(!!document.getElementById('firstName')?.value.trim());
+    checks.push(!!document.getElementById('lastName')?.value.trim());
+
+    // רקע מקצועי
+    checks.push(!!document.querySelector('input[name="education"]:checked'));
+    checks.push(!!document.querySelector('input[name="current_field"]:checked'));
+    checks.push(!!document.getElementById('experience')?.value);
+    checks.push(!!document.querySelector('input[name="english_level"]:checked'));
+
+    // תחום עניין
+    const fieldChosen = document.querySelector('input[name="field"]:checked');
+    checks.push(!!fieldChosen);
+
+    // אם נבחר תחום – נפתח את המקטע שלו ונחשב את השאלות הנוספות
+    if (fieldChosen) {
+      if (typeof showDynamicForField === 'function') {
+        showDynamicForField(fieldChosen.value, true);
+      }
+      const CONDITIONAL_BY_FIELD = {
+        data:     ['data_programming','data_interest'],
+        ai:       ['ai_interest'],
+        cyber:    ['cyber_technical','cyber_interest'],
+        pm:       ['pm_experience'],
+        digital:  ['digital_interest'],
+        business: ['business_interest'],
+      };
+      (CONDITIONAL_BY_FIELD[fieldChosen.value] || [])
+        .forEach(name => checks.push(!!document.querySelector(`input[name="${name}"]:checked`)));
+    }
+
+    // העדפות לימוד
+    checks.push(!!document.querySelector('input[name="study_mode"]:checked'));
+    checks.push(!!document.querySelector('input[name="start_time"]:checked'));
+    checks.push(!!document.querySelector('input[name="preferred_campus"]:checked'));
+
+    // מטרות
+    checks.push(document.querySelectorAll('input[name="goals"]:checked').length > 0);
+
+    // חישוב ועדכון UI
+    const done  = checks.filter(Boolean).length;
+    const total = checks.length;
+    const pct   = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+
+    const fill  = document.getElementById('progressFill');
+    const text  = document.getElementById('progressText');
+    if (fill) fill.style.width = pct + '%';
+    if (text) text.textContent = pct + '%';
+  }
+
+  // טוויק קטן לוולידציה: ודא שהמקטע הדינמי נפתח לפני בדיקת השאלות הנוספות
+  (function patchValidateOpenSection() {
+    const form = document.getElementById('courseForm');
+    if (!form) return;
+    const origValidate = window.validateInOrder;
+    if (typeof origValidate !== 'function') return;
+
+    window.validateInOrder = async function() {
+      // אם נבחר תחום – פתח את המקטע שלו לפני בדיקות השאלות המותנות
+      const chosen = document.querySelector('input[name="field"]:checked');
+      if (chosen && typeof showDynamicForField === 'function') {
+        showDynamicForField(chosen.value);
+      }
+      return origValidate.apply(this, arguments);
+    };
+  })();
+
+  // הפעלה ראשונית
+  document.addEventListener('DOMContentLoaded', updateProgress);
+</script>
+
+</body>
+</html>
