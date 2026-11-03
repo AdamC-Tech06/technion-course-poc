@@ -2,6 +2,7 @@ import azure.functions as func
 import json
 import logging
 import os
+import re
 from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -23,11 +24,16 @@ COURSES_CATALOG = """
 8. ניהול מוצר (Product Management) - אפיון, חוויית משתמש (UX), אסטרטגיה עסקית והובלת מוצרים דיגיטליים.
 """
 
+def clean_env(val: str) -> str:
+    """מסיר רווחים ותווי כיווניות נסתרים (RTL/LTR) שהועתקו מהדפדפן"""
+    if not val:
+        return ""
+    return re.sub(r'[^\x21-\x7E]', '', val)
+
 @app.route(route="match-courses", methods=["POST", "OPTIONS"])
 def match_courses(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("Course matcher API received a request.")
 
-    # מענה לבדיקת Preflight (CORS) של הדפדפן
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=200, headers=CORS_HEADERS)
 
@@ -41,9 +47,9 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json"
         )
 
-    api_key = os.environ.get("OPENAI_API_KEY")
-    base_url = os.environ.get("OPENAI_BASE_URL", "https://models.inference.ai.azure.com")
-    model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    api_key = clean_env(os.environ.get("OPENAI_API_KEY", ""))
+    base_url = clean_env(os.environ.get("OPENAI_BASE_URL", "https://api.groq.com/openai/v1"))
+    model_name = clean_env(os.environ.get("OPENAI_MODEL", "llama-3.3-70b-versatile"))
 
     if not api_key:
         return func.HttpResponse(
@@ -103,9 +109,11 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except Exception as e:
-        logging.error(f"Error communicating with AI model: {str(e)}")
+        cause = repr(e.__cause__) if e.__cause__ else "None"
+        error_details = f"{type(e).__name__}: {str(e)} | Underlying cause: {cause}"
+        logging.error(f"Error communicating with AI model: {error_details}")
         return func.HttpResponse(
-            json.dumps({"error": f"Internal server error: {str(e)}"}),
+            json.dumps({"error": error_details}),
             status_code=500,
             headers=CORS_HEADERS,
             mimetype="application/json"
