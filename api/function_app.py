@@ -14,18 +14,17 @@ CORS_HEADERS = {
 }
 
 COURSES_CATALOG = """
-1. פיתוח Full Stack ו-Web (React, Node.js, Python, ענן, מסדי נתונים, Git) - מתאים למי שרוצה להיכנס לפיתוח תוכנה מאפס או להסב מקצוע.
-2. בינה מלאכותית ולמידת מכונה (AI & Machine Learning, Data Science, Python, Deep Learning, LLMs) - מיועד לבעלי רקע כמותי, תכנותי או אקדמי שרוצים להתמחות ב-AI.
-3. ניתוח נתונים ו-BI (Data Analyst, SQL, Power BI, Python, סטטיסטיקה יישומית) - מתאים לחסרי רקע טכנולוגי עמוק המעוניינים בתפקידי דאטה עסקיים.
-4. סייבר ואבטחת מידע (Cyber Security, רשתות, הגנה ותקיפה, SOC, ענן) - מיועד לבעלי זיקה לתשתיות, IT ורשתות תקשורת.
-5. ניהול פרויקטים טכנולוגיים ומתודולוגיות Agile/Scrum - מתאים לבעלי ניסיון ניהולי או ארגוני המעוניינים להוביל פרויקטים בעולמות הטק.
-6. DevOps וארכיטקטורת ענן (Cloud Engineering, Docker, Kubernetes, CI/CD, Azure/AWS) - מיועד למפתחים או אנשי סיסטם המעוניינים בהתמחות ענן.
-7. בדיקות תוכנה ואבטחת איכות (QA ידני ואוטומציה ב-Python/Selenium) - כרטיס כניסה מהיר לעולם ההייטק ללא צורך בידע מוקדם.
-8. ניהול מוצר (Product Management) - אפיון, חוויית משתמש (UX), אסטרטגיה עסקית והובלת מוצרים דיגיטליים.
+1. פיתוח Full Stack ו-Web (React, Node.js, Python, ענן, מסדי נתונים, Git) - קמפוס חיפה ושרונה | מועד קרוב: בחודש הקרוב | מתאים לחסרי רקע תכנותי או למעוניינים בהסבה מהירה | לינק: https://cont-ed.technion.ac.il
+2. בינה מלאכותית ולמידת מכונה (AI, Deep Learning, Data Science, Python, LLMs) - קמפוס חיפה ושרונה | מועד קרוב: בשלושה חודשים | דורש רקע כמותי/תכנותי ואנגלית טובה מאוד | לינק: https://cont-ed.technion.ac.il
+3. ניתוח נתונים ו-BI (Data Analyst, SQL, Power BI, Python, סטטיסטיקה) - קמפוס חיפה ושרונה | מועד קרוב: בחודש הקרוב | מתאים לבעלי רקע עסקי המעוניינים בתפקידי דאטה | לינק: https://cont-ed.technion.ac.il
+4. סייבר ואבטחת מידע (Cyber Security, רשתות, הגנה ותקיפה SOC) - קמפוס חיפה ושרונה | מועד קרוב: בהקדם | מתאים לבעלי זיקה לתשתיות ו-IT | לינק: https://cont-ed.technion.ac.il
+5. ניהול פרויקטים טכנולוגיים ומתודולוגיות Agile/Scrum - קמפוס שרונה וחיפה | מועד קרוב: גמיש | מתאים לבעלי ניסיון ניהולי או ארגוני | לינק: https://cont-ed.technion.ac.il
+6. DevOps וארכיטקטורת ענן (Docker, Kubernetes, CI/CD, Azure/AWS) - קמפוס שרונה וחיפה | מועד קרוב: בחודש הקרוב | מיועד למפתחים או אנשי סיסטם | לינק: https://cont-ed.technion.ac.il
+7. בדיקות תוכנה ואבטחת איכות (QA ידני ואוטומציה ב-Python) - קמפוס חיפה ושרונה | מועד קרוב: בהקדם | מתאים לחסרי רקע שרוצים להיכנס לתחום | לינק: https://cont-ed.technion.ac.il
+8. ניהול מוצר (Product Management - אפיון, UI/UX ואסטרטגיה) - קמפוס שרונה | מועד קרוב: בשלושה חודשים | מתאים לבעלי רקע עסקי, שיווקי או עיצובי | לינק: https://cont-ed.technion.ac.il
 """
 
 def clean_env(val: str) -> str:
-    """מסיר רווחים ותווי כיווניות נסתרים (RTL/LTR) שהועתקו מהדפדפן"""
     if not val:
         return ""
     return re.sub(r'[^\x21-\x7E]', '', val)
@@ -49,7 +48,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
     api_key = clean_env(os.environ.get("OPENAI_API_KEY", ""))
     base_url = clean_env(os.environ.get("OPENAI_BASE_URL", "https://api.groq.com/openai/v1"))
-    model_name = clean_env(os.environ.get("OPENAI_MODEL", "llama-3.3-70b-versatile"))
+    model_name = clean_env(os.environ.get("OPENAI_MODEL", "llama-3.1-8b-instant"))
 
     if not api_key:
         return func.HttpResponse(
@@ -69,35 +68,55 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 קטלוג הקורסים:
 {COURSES_CATALOG}
 
-הנחיות קריטיות למענה:
+הנחיות קריטיות למבנה הפלט (חובה להקפיד ב-100%):
 1. החזר תמיד אך ורק אובייקט JSON חוקי ותקני, ללא שום טקסט מקדים, ללא הסברים מסביב, וללא תגיות Markdown של ```json.
-2. ה-JSON חייב להיות במבנה הבא בדיוק:
+2. ה-JSON חייב להכיל מפתח ראשי יחיד בשם "results" המכיל מערך של קורסים.
+3. שדות כל אובייקט במערך חייבים להיות בעברית בדיוק לפי השמות הבאים:
 {{
-  "candidateName": "שם המועמד (אם סופק)",
-  "topRecommendation": "שם הקורס בעל ההתאמה הגבוהה ביותר",
-  "summary": "סיכום קצר, מקצועי ומעודד (בעברית) המסביר מדוע קורס זה נבחר עבורו",
-  "matches": [
+  "results": [
     {{
-      "courseName": "שם הקורס",
-      "matchScore": 95,
-      "reason": "נימוק מפורט ומותאם אישית להעדפותיו ולרקע שלו (בעברית)",
-      "fitLevel": "גבוהה מאוד / גבוהה / בינונית"
+      "שם הקורס": "שם הקורס מתוך הקטלוג",
+      "ציון התאמה": 95,
+      "תאריך התחלה": "מועד התחלה מותאם",
+      "קמפוס": "חיפה / שרונה",
+      "נימוק": "נימוק אישי מפורט בעברית המסביר מדוע הקורס מתאים לרקע, להשכלה ולמטרות שלו",
+      "לינק לעמוד התכנית": "[https://cont-ed.technion.ac.il](https://cont-ed.technion.ac.il)"
     }}
   ]
 }}
-3. דרג לפחות 3 קורסים מתוך הקטלוג לפי אחוזי התאמה יורדים (0 עד 100).
-4. כל הטקסטים והנימוקים חייבים להיכתב בעברית תקנית, רהוטה ומזמינה.
+4. דרג לפחות 3 קורסים מומלצים עם ציון התאמה גבוה (מעל 70), ו-1 עד 2 קורסים עם ציון 0 עבור קורסים שאינם מתאימים בעליל לרקע המועמד (כדי שהממשק יציג גם קורסים שנפסלו).
+5. "ציון התאמה" חייב להיות מספר שלם (Integer בין 0 ל-100).
+6. כל הנימוקים והטקסטים חייבים להיכתב בעברית תקנית, רהוטה ומקצועית.
 """
 
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"נתוני השאלון של המועמד:\n{json.dumps(req_body, ensure_ascii=False)}"}
-            ],
-            temperature=0.3,
-            response_format={"type": "json_object"}
-        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"נתוני השאלון של המועמד:\n{json.dumps(req_body, ensure_ascii=False)}"}
+        ]
+
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                response_format={"type": "json_object"}
+            )
+        except Exception as model_err:
+            logging.warning(f"Default model {model_name} failed. Attempting fallback: {model_err}")
+            available_models = [
+                m.id for m in client.models.list().data
+                if not any(x in m.id.lower() for x in ["whisper", "guard", "tts", "vision", "embed"])
+            ]
+            if not available_models:
+                raise model_err
+            fallback_model = available_models[0]
+            logging.info(f"Falling back to model: {fallback_model}")
+            response = client.chat.completions.create(
+                model=fallback_model,
+                messages=messages,
+                temperature=0.3,
+                response_format={"type": "json_object"}
+            )
 
         ai_content = response.choices[0].message.content
 
