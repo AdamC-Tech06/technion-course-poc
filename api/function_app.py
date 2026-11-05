@@ -328,3 +328,4 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             headers=CORS_HEADERS,
             mimetype="application/json"
+        )
