@@ -42,10 +42,6 @@ def load_courses_catalog():
     df = pd.read_csv(StringIO(response.text))
     df = df.fillna("")
 
-    logging.info(f"Columns: {list(df.columns)}")
-
-logging.info(
-    f"First row: {df.iloc[0].to_dict()}"
 )
 
     today = datetime.today()
