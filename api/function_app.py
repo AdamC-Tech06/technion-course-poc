@@ -42,6 +42,24 @@ def load_courses_catalog():
     df = pd.read_csv(StringIO(response.text))
     df = df.fillna("")
 
+    logging.info(f"Columns found: {list(df.columns)}")
+
+    date_column = None
+
+    possible_columns = [
+        "ת. פתיחה",
+        "תאריך פתיחה",
+        "מועד פתיחה",
+        "תאריך התחלה"
+    ]
+
+    for col in possible_columns:
+        if col in df.columns:
+            date_column = col
+            break
+
+    logging.info(f"Date column found: {date_column}")
+
     today = datetime.today()
     cutoff_date = today - timedelta(days=14)
 
@@ -49,37 +67,60 @@ def load_courses_catalog():
 
     for _, row in df.iterrows():
 
-        start_date = str(
-            row.get("ת. פתיחה", "")
-        ).strip()
+        keep_course = True
 
-        if start_date:
+        if date_column:
 
-            try:
+            raw_date = str(
+                row.get(date_column, "")
+            ).strip()
 
-                course_date = datetime.strptime(
-                    start_date,
-                    "%d/%m/%Y"
-                )
+            logging.info(
+                f"Checking course date: {raw_date}"
+            )
 
-                if course_date < cutoff_date:
+            if raw_date:
 
-                    logging.info(
-                        f"Skipping old course date: {start_date}"
+                parsed = None
+
+                for fmt in [
+                    "%d/%m/%Y",
+                    "%d/%m/%y",
+                    "%Y-%m-%d",
+                    "%d.%m.%Y"
+                \]:
+
+                    try:
+                        parsed = datetime.strptime(
+                            raw_date,
+                            fmt
+                        )
+                        break
+
+                    except Exception:
+                        pass
+
+                if parsed:
+
+                    if parsed < cutoff_date:
+
+                        logging.info(
+                            f"Excluded course. Date={raw_date}"
+                        )
+
+                        keep_course = False
+
+                else:
+
+                    logging.warning(
+                        f"Could not parse date: {raw_date}"
                     )
 
-                    continue
-
-            except Exception:
-
-                logging.warning(
-                    f"Could not parse date: {start_date}"
-                )
-
-        filtered_rows.append(row)
+        if keep_course:
+            filtered_rows.append(row)
 
     logging.info(
-        f"Courses after 14-day filter: {len(filtered_rows)}"
+        f"Courses after filter: {len(filtered_rows)}"
     )
 
     catalog = ""
@@ -106,7 +147,6 @@ def load_courses_catalog():
             catalog += "=" * 80
 
     return catalog
-
 
 @app.route(route="match-courses", methods=["POST", "OPTIONS"])
 def match_courses(req: func.HttpRequest) -> func.HttpResponse:
