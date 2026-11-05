@@ -42,8 +42,6 @@ def load_courses_catalog():
     df = pd.read_csv(StringIO(response.text))
     df = df.fillna("")
 
-)
-
     today = datetime.today()
     cutoff_date = today - timedelta(days=14)
 
@@ -330,4 +328,3 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             headers=CORS_HEADERS,
             mimetype="application/json"
-        )
