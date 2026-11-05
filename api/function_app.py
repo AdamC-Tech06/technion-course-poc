@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 
 from io import StringIO
+from datetime import datetime, timedelta
 from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -21,6 +22,7 @@ CORS_HEADERS = {
 def clean_env(val: str) -> str:
     if not val:
         return ""
+
     return re.sub(r'[^\x21-\x7E]', '', val)
 
 
@@ -40,9 +42,49 @@ def load_courses_catalog():
     df = pd.read_csv(StringIO(response.text))
     df = df.fillna("")
 
-    catalog = ""
+    today = datetime.today()
+    cutoff_date = today - timedelta(days=14)
+
+    filtered_rows = []
 
     for _, row in df.iterrows():
+
+        start_date = str(
+            row.get("ת. פתיחה", "")
+        ).strip()
+
+        if start_date:
+
+            try:
+
+                course_date = datetime.strptime(
+                    start_date,
+                    "%d/%m/%Y"
+                )
+
+                if course_date < cutoff_date:
+
+                    logging.info(
+                        f"Skipping old course date: {start_date}"
+                    )
+
+                    continue
+
+            except Exception:
+
+                logging.warning(
+                    f"Could not parse date: {start_date}"
+                )
+
+        filtered_rows.append(row)
+
+    logging.info(
+        f"Courses after 14-day filter: {len(filtered_rows)}"
+    )
+
+    catalog = ""
+
+    for row in filtered_rows:
 
         row_data = []
 
@@ -51,11 +93,13 @@ def load_courses_catalog():
             value = str(row[col]).strip()
 
             if value:
+
                 row_data.append(
                     f"{col}: {value}"
                 )
 
         if row_data:
+
             catalog += "\n\n"
             catalog += "\n".join(row_data)
             catalog += "\n"
@@ -67,15 +111,19 @@ def load_courses_catalog():
 @app.route(route="match-courses", methods=["POST", "OPTIONS"])
 def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
-    logging.info("Course matcher API received a request.")
+    logging.info(
+        "Course matcher API received a request."
+    )
 
     if req.method == "OPTIONS":
+
         return func.HttpResponse(
             status_code=200,
             headers=CORS_HEADERS
         )
 
     try:
+
         req_body = req.get_json()
 
     except Exception:
@@ -92,7 +140,10 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     api_key = clean_env(
-        os.environ.get("OPENAI_API_KEY", "")
+        os.environ.get(
+            "OPENAI_API_KEY",
+            ""
+        )
     )
 
     base_url = clean_env(
@@ -157,6 +208,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 11. המלץ רק על קורסים הרלוונטיים להרשמה.
 12. כל הנימוקים בעברית מקצועית.
 13. השתמש במידע מכל העמודות בטבלה לצורך קבלת ההחלטה.
+14. קורסים שתאריך הפתיחה שלהם ישן ביותר מ-14 יום כבר סוננו מראש ואין להתייחס אליהם.
 
 מבנה הפלט:
 
