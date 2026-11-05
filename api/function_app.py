@@ -17,7 +17,7 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
-# ביטוי רגולרי שתופס תאריכים בכל פורמט: DD/MM/YYYY, DD.MM.YYYY, DD/MM/YY, DD-MM-YYYY
+# תופס תאריכים מכל סוג: 01/10/2026, 1/10/2026, 1.10.26 וכו'
 DATE_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
 
 
@@ -28,10 +28,9 @@ def clean_env(val: str) -> str:
 
 
 def extract_dates_from_text(text: str) -> list:
-    """מחלץ את כל התאריכים מתוך טקסט חופשי וממיר אותם לאובייקטי datetime"""
+    """מחלץ את כל התאריכים מתוך הטקסט"""
     if not text:
         return []
-    
     parsed_dates = []
     for match in DATE_PATTERN.finditer(str(text)):
         day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
@@ -44,29 +43,42 @@ def extract_dates_from_text(text: str) -> list:
     return parsed_dates
 
 
-def is_course_expired(row: dict, date_columns: list, cutoff_date: datetime) -> bool:
+def is_course_expired_or_unavailable(row: dict, date_columns: list, cutoff_date: datetime) -> bool:
     """
-    בודק האם הקורס עבר את חוק ה-14 יום.
-    מחזיר True אם נמצאו תאריכי פתיחה בשורה וכולם ישנים יותר מ-cutoff_date.
+    בודק האם הקורס אינו רלוונטי להרשמה:
+    1. אם תאריך הפתיחה ישן ביותר מ-14 יום.
+    2. אם רשום במפורש 'ללא צפי' או שההרשמה סגורה.
     """
-    found_dates = []
+    all_text = " ".join(str(v) for v in row.values())
 
-    # 1. בדיקה בעמודות התאריך המזוהות
+    # בדיקה מפורשת של עמודת תאריך פתיחה
+    for col in date_columns:
+        val = str(row.get(col, "")).strip()
+        if "ללא צפי" in val or "לא ידוע" in val:
+            return True
+
+    # בדיקת מועדי פתיחה ותאריכי הרשמה שפגו
+    found_dates = []
     for col in date_columns:
         cell_val = str(row.get(col, "")).strip()
         if cell_val:
             found_dates.extend(extract_dates_from_text(cell_val))
 
-    # 2. אם לא נמצאו תאריכים בעמודת התאריך, סריקת גיבוי בכל תאי השורה
-    if not found_dates:
-        for col, val in row.items():
-            if any(k in col for k in ["פתיחה", "התחלה", "מועד", "תאריך"]):
-                found_dates.extend(extract_dates_from_text(str(val)))
-
-    # אם לקורס יש תאריכים מוגדרים, וכל התאריכים שלו קטנים מתאריך הסף (לפני יותר מ-14 יום) -> הקורס פג תוקף!
+    # אם יש תאריכי פתיחה וכולם ישנים מ-14 יום אחורה
     if found_dates:
         if all(d < cutoff_date for d in found_dates):
             return True
+
+    # בדיקה אם בשם הקורס/הערות מופיע שההרשמה נסגרה (כמו "הרשמה מאוחרת עד 15/09")
+    deadline_match = re.search(r'הרשמה.*?עד\s*(\d{1,2})[/.](\d{1,2})', all_text)
+    if deadline_match:
+        d_day, d_month = int(deadline_match.group(1)), int(deadline_match.group(2))
+        try:
+            deadline_date = datetime(cutoff_date.year, d_month, d_day)
+            if deadline_date < cutoff_date:
+                return True
+        except ValueError:
+            pass
 
     return False
 
@@ -82,17 +94,14 @@ def load_courses_catalog() -> str:
 
     response = requests.get(csv_url, timeout=30)
     response.raise_for_status()
-    # הבטחת קידוד UTF-8 תקין לעברית וניקוי BOM
     response.encoding = "utf-8-sig"
 
     reader = csv.DictReader(StringIO(response.text))
     if not reader.fieldnames:
         return ""
 
-    # ניקוי רווחים משמות העמודות
     clean_fieldnames = [col.strip() for col in reader.fieldnames if col]
 
-    # זיהוי אוטומטי של כל עמודה שמייצגת תאריך פתיחה/התחלה
     date_columns = [
         col for col in clean_fieldnames
         if any(keyword in col for keyword in ["פתיחה", "התחלה", "מועד", "תאריך", "ת."])
@@ -105,21 +114,19 @@ def load_courses_catalog() -> str:
     skipped_count = 0
 
     for raw_row in reader:
-        # יצירת מילון נקי עם שמות עמודות ללא רווחים מיותרים
         row = {k.strip(): (v.strip() if isinstance(v, str) else "") for k, v in raw_row.items() if k}
 
-        # דילוג על שורות ריקות לחלוטין
         if not any(row.values()):
             continue
 
-        if is_course_expired(row, date_columns, cutoff_date):
+        if is_course_expired_or_unavailable(row, date_columns, cutoff_date):
             skipped_count += 1
-            logging.info(f"Filtered out expired course (>14 days): {row.get('שם הקורס', '')}")
+            logging.info(f"Skipping course (expired or no date): {row.get('שם הקורס', '')}")
             continue
 
         filtered_rows.append(row)
 
-    logging.info(f"Courses kept: {len(filtered_rows)} | Courses filtered out (>14 days): {skipped_count}")
+    logging.info(f"Courses kept: {len(filtered_rows)} | Skipped: {skipped_count}")
 
     catalog_blocks = []
     for row in filtered_rows:
@@ -127,8 +134,7 @@ def load_courses_catalog() -> str:
         for col in clean_fieldnames:
             val = row.get(col, "")
             if val:
-                # וידוא שלינקים תמיד יתחילו ב-https:// כדי למנוע שגיאות 404 באתר
-                if ("לינק" in col or "קישור" in col or "אתר" in col) and val != "לא זמין":
+                if ("לינק" in col or "קישור" in col or "דפי מידע" in col or "אתר" in col) and val != "לא זמין":
                     if not val.startswith("http://") and not val.startswith("https://"):
                         val = "https://" + val
                 row_lines.append(f"{col}: {val}")
@@ -178,7 +184,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         system_prompt = f"""
 אתה יועץ לימודים ומנהל אקדמי מומחה של בית הספר ללימודי המשך של הטכניון.
 התאריך של היום הוא: {today_str}.
-תאריך הסף להרשמה (14 יום אחורה מהיום) הוא: {cutoff_str}.
+תאריך הסף להרשמה (14 יום אחורה מהיום): {cutoff_str}.
 
 תפקידך לנתח את פרטי השאלון שמילא המועמד, להצליב אותם מול קטלוג הקורסים הפעילים שלהלן, ולספק התאמה מדויקת ומנומקת.
 
@@ -186,15 +192,14 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 {courses_catalog}
 
 הנחיות קריטיות (חובה להקפיד ב-100%):
-1. החזר אך ורק אובייקט JSON תקין, ללא Markdown וללא שום טקסט מחוץ ל-JSON.
-2. חוק 14 הימים (קריטי!): חל איסור מוחלט להציג או להמליץ על קורס שתאריך ההתחלה/פתיחה שלו מוקדם יותר מ-{cutoff_str} (כלומר עברו יותר מ-14 יום מאז שנפתח). אם קורס כזה מופיע, התעלם ממנו לחלוטין ואל תכלול אותו בפלט.
-3. החזר לפחות 3 קורסים מומלצים מבין הקורסים הפעילים.
-4. ניתן להחזיר 1-2 קורסים שנפסלו עם ציון 0 (בגלל אי-עמידה בתנאי קבלה או חוסר התאמה לתחום).
-5. "ציון התאמה" חייב להיות מספר שלם (Integer) בין 0 ל-100.
-6. השתמש אך ורק בקורסים ובלינקים המופיעים בקטלוג שלמעלה. ודא שכל לינק מתחיל ב-https://.
-7. כל הנימוקים בעברית מקצועית, רהוטה ובגוף שלישי.
+1. החזר אך ורק אובייקט JSON תקין, ללא שום טקסט או Markdown מסביב.
+2. חוק מועדי הרשמה: אל תמליץ לעולם על קורס שתאריך הפתיחה שלו עבר את {cutoff_str}, או שמוגדר כ'ללא צפי' / 'הרשמה סגורה'.
+3. החזר קורסים מומלצים מבין הקורסים הפעילים בלבד שיש להם מועד פתיחה עתידי ורלוונטי.
+4. "ציון התאמה" חייב להיות מספר שלם בין 0 ל-100.
+5. השתמש אך ורק בלינקים כפי שמופיעים בקטלוג (תמיד עם https://).
+6. כל הנימוקים בעברית מקצועית, בגוף שלישי ("המועמד").
 
-מבנה הפלט הנדרש:
+מבנה הפלט:
 {{
   "results": [
     {{
