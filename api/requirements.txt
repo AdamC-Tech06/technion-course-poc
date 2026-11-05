@@ -3,3 +3,4 @@ openai>=1.50.0,<2.0.0
 httpx<1.0.0
 pandas
 openpyxl
+requests
