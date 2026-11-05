@@ -4,7 +4,9 @@ import logging
 import os
 import re
 import pandas as pd
-from pathlib import Path
+import requests
+
+from io import StringIO
 from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -23,47 +25,48 @@ def clean_env(val: str) -> str:
 
 
 def load_courses_catalog():
-    excel_path = Path(__file__).parent / "Technion Course - Limor.xlsx"
 
-    df = pd.read_excel(excel_path)
+    sheet_id = "1emkWYVjlrhC0m67gz7b3MUXzsG3RtlX-kbg8eNvzBtc"
+    gid = "1525331068"
+
+    csv_url = (
+        f"https://docs.google.com/spreadsheets/d/"
+        f"{sheet_id}/export?format=csv&gid={gid}"
+    )
+
+    response = requests.get(csv_url, timeout=30)
+    response.raise_for_status()
+
+    df = pd.read_csv(StringIO(response.text))
     df = df.fillna("")
 
     catalog = ""
 
     for _, row in df.iterrows():
-        catalog += f"""
 
-שם הקורס: {row.get('שם הקורס', '')}
+        row_data = []
 
-תיאור:
-{row.get('תיאור', '')}
+        for col in df.columns:
 
-תחום:
-{row.get('תחום', '')}
+            value = str(row[col]).strip()
 
-תנאי קבלה:
-{row.get('תנאי קבלה', '')}
+            if value:
+                row_data.append(
+                    f"{col}: {value}"
+                )
 
-מתכונת לימודים:
-{row.get('מתכונת לימודים', '')}
-
-קמפוס:
-{row.get('קמפוס', '')}
-
-מועד התחלה:
-{row.get('מועד התחלה', '')}
-
-לינק לעמוד התכנית:
-{row.get('לינק לעמוד התכנית', '')}
-
-==================================================
-"""
+        if row_data:
+            catalog += "\n\n"
+            catalog += "\n".join(row_data)
+            catalog += "\n"
+            catalog += "=" * 80
 
     return catalog
 
 
 @app.route(route="match-courses", methods=["POST", "OPTIONS"])
 def match_courses(req: func.HttpRequest) -> func.HttpResponse:
+
     logging.info("Course matcher API received a request.")
 
     if req.method == "OPTIONS":
@@ -74,21 +77,31 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         req_body = req.get_json()
+
     except Exception:
+
         return func.HttpResponse(
-            json.dumps({"error": "Invalid JSON format in request body"}),
+            json.dumps(
+                {
+                    "error": "Invalid JSON format in request body"
+                }
+            ),
             status_code=400,
             headers=CORS_HEADERS,
             mimetype="application/json"
         )
 
-    api_key = clean_env(os.environ.get("OPENAI_API_KEY", ""))
+    api_key = clean_env(
+        os.environ.get("OPENAI_API_KEY", "")
+    )
+
     base_url = clean_env(
         os.environ.get(
             "OPENAI_BASE_URL",
             "https://api.groq.com/openai/v1"
         )
     )
+
     model_name = clean_env(
         os.environ.get(
             "OPENAI_MODEL",
@@ -97,9 +110,12 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
     )
 
     if not api_key:
+
         return func.HttpResponse(
             json.dumps(
-                {"error": "Missing OPENAI_API_KEY configuration on Azure"}
+                {
+                    "error": "Missing OPENAI_API_KEY configuration on Azure"
+                }
             ),
             status_code=500,
             headers=CORS_HEADERS,
@@ -107,6 +123,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     try:
+
         courses_catalog = load_courses_catalog()
 
         client = OpenAI(
@@ -134,8 +151,12 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 5. ניתן להחזיר 1-2 קורסים שנפסלו עם ציון 0.
 6. ציון התאמה חייב להיות מספר שלם בין 0 ל-100.
 7. השתמש אך ורק בקורסים המופיעים בקטלוג.
-8. השתמש בלינק לעמוד התכנית כפי שמופיע בקטלוג.
-9. כל הנימוקים בעברית מקצועית.
+8. השתמש בלינקים כפי שמופיעים בקטלוג.
+9. אל תמליץ על קורסים שההרשמה אליהם הסתיימה.
+10. אל תמליץ על קורסים שאינם פעילים.
+11. המלץ רק על קורסים הרלוונטיים להרשמה.
+12. כל הנימוקים בעברית מקצועית.
+13. השתמש במידע מכל העמודות בטבלה לצורך קבלת ההחלטה.
 
 מבנה הפלט:
 
@@ -160,22 +181,28 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             },
             {
                 "role": "user",
-                "content": (
+                "content":
                     "נתוני השאלון של המועמד:\n"
-                    + json.dumps(req_body, ensure_ascii=False)
-                )
+                    + json.dumps(
+                        req_body,
+                        ensure_ascii=False
+                    )
             }
         ]
 
         try:
+
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
                 temperature=0.3,
-                response_format={"type": "json_object"}
+                response_format={
+                    "type": "json_object"
+                }
             )
 
         except Exception as model_err:
+
             logging.warning(
                 f"Default model {model_name} failed. "
                 f"Attempting fallback: {model_err}"
@@ -209,7 +236,9 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
                 model=fallback_model,
                 messages=messages,
                 temperature=0.3,
-                response_format={"type": "json_object"}
+                response_format={
+                    "type": "json_object"
+                }
             )
 
         ai_content = response.choices[0].message.content
@@ -222,7 +251,12 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except Exception as e:
-        cause = repr(e.__cause__) if e.__cause__ else "None"
+
+        cause = (
+            repr(e.__cause__)
+            if e.__cause__
+            else "None"
+        )
 
         error_details = (
             f"{type(e).__name__}: {str(e)} | "
@@ -234,7 +268,11 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
         return func.HttpResponse(
-            json.dumps({"error": error_details}),
+            json.dumps(
+                {
+                    "error": error_details
+                }
+            ),
             status_code=500,
             headers=CORS_HEADERS,
             mimetype="application/json"
