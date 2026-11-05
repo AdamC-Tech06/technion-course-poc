@@ -17,7 +17,6 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
-# תופס תאריכים מכל סוג: 01/10/2026, 1/10/2026, 1.10.26 וכו'
 DATE_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
 
 
@@ -28,7 +27,6 @@ def clean_env(val: str) -> str:
 
 
 def extract_dates_from_text(text: str) -> list:
-    """מחלץ את כל התאריכים מתוך הטקסט"""
     if not text:
         return []
     parsed_dates = []
@@ -43,44 +41,45 @@ def extract_dates_from_text(text: str) -> list:
     return parsed_dates
 
 
-def is_course_expired_or_unavailable(row: dict, date_columns: list, cutoff_date: datetime) -> bool:
+def check_course_date_status(row: dict, date_columns: list, cutoff_date: datetime) -> str:
     """
-    בודק האם הקורס אינו רלוונטי להרשמה:
-    1. אם תאריך הפתיחה ישן ביותר מ-14 יום.
-    2. אם רשום במפורש 'ללא צפי' או שההרשמה סגורה.
+    בודק האם הקורס בתוקף מבחינת מועדי פתיחה:
+    - מחזיר 'EXPIRED' אם עברו מעל 14 יום
+    - מחזיר 'NO_SCHEDULE' אם רשום ללא צפי
+    - מחזיר 'ACTIVE' אם התאריך עתידי או בטווח המותר
     """
-    all_text = " ".join(str(v) for v in row.values())
-
-    # בדיקה מפורשת של עמודת תאריך פתיחה
     for col in date_columns:
         val = str(row.get(col, "")).strip()
         if "ללא צפי" in val or "לא ידוע" in val:
-            return True
+            return "NO_SCHEDULE"
 
-    # בדיקת מועדי פתיחה ותאריכי הרשמה שפגו
     found_dates = []
     for col in date_columns:
         cell_val = str(row.get(col, "")).strip()
         if cell_val:
             found_dates.extend(extract_dates_from_text(cell_val))
 
-    # אם יש תאריכי פתיחה וכולם ישנים מ-14 יום אחורה
+    if not found_dates:
+        for col, val in row.items():
+            if any(k in col for k in ["פתיחה", "התחלה", "מועד", "תאריך"]):
+                found_dates.extend(extract_dates_from_text(str(val)))
+
     if found_dates:
         if all(d < cutoff_date for d in found_dates):
-            return True
+            return "EXPIRED"
 
-    # בדיקה אם בשם הקורס/הערות מופיע שההרשמה נסגרה (כמו "הרשמה מאוחרת עד 15/09")
+    all_text = " ".join(str(v) for v in row.values())
     deadline_match = re.search(r'הרשמה.*?עד\s*(\d{1,2})[/.](\d{1,2})', all_text)
     if deadline_match:
         d_day, d_month = int(deadline_match.group(1)), int(deadline_match.group(2))
         try:
             deadline_date = datetime(cutoff_date.year, d_month, d_day)
             if deadline_date < cutoff_date:
-                return True
+                return "EXPIRED"
         except ValueError:
             pass
 
-    return False
+    return "ACTIVE"
 
 
 def load_courses_catalog() -> str:
@@ -101,7 +100,6 @@ def load_courses_catalog() -> str:
         return ""
 
     clean_fieldnames = [col.strip() for col in reader.fieldnames if col]
-
     date_columns = [
         col for col in clean_fieldnames
         if any(keyword in col for keyword in ["פתיחה", "התחלה", "מועד", "תאריך", "ת."])
@@ -110,27 +108,24 @@ def load_courses_catalog() -> str:
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
 
-    filtered_rows = []
-    skipped_count = 0
+    catalog_blocks = []
 
     for raw_row in reader:
         row = {k.strip(): (v.strip() if isinstance(v, str) else "") for k, v in raw_row.items() if k}
-
         if not any(row.values()):
             continue
 
-        if is_course_expired_or_unavailable(row, date_columns, cutoff_date):
-            skipped_count += 1
-            logging.info(f"Skipping course (expired or no date): {row.get('שם הקורס', '')}")
-            continue
+        status = check_course_date_status(row, date_columns, cutoff_date)
 
-        filtered_rows.append(row)
-
-    logging.info(f"Courses kept: {len(filtered_rows)} | Skipped: {skipped_count}")
-
-    catalog_blocks = []
-    for row in filtered_rows:
         row_lines = []
+        # תיוג סטטוס תאריך עבור מודל ה-AI
+        if status == "EXPIRED":
+            row_lines.append("סטטוס פתיחה: פג תוקף (עברו מעל 14 יום ממועד הפתיחה - חובה לתת ציון 0 ולפסול)")
+        elif status == "NO_SCHEDULE":
+            row_lines.append("סטטוס פתיחה: ללא צפי פתיחה (חובה לתת ציון 0 ולפסול)")
+        else:
+            row_lines.append("סטטוס פתיחה: פעיל ורלוונטי להרשמה")
+
         for col in clean_fieldnames:
             val = row.get(col, "")
             if val:
@@ -183,31 +178,32 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
         system_prompt = f"""
 אתה יועץ לימודים ומנהל אקדמי מומחה של בית הספר ללימודי המשך של הטכניון.
-התאריך של היום הוא: {today_str}.
+התאריך של היום: {today_str}.
 תאריך הסף להרשמה (14 יום אחורה מהיום): {cutoff_str}.
 
-תפקידך לנתח את פרטי השאלון שמילא המועמד, להצליב אותם מול קטלוג הקורסים הפעילים שלהלן, ולספק התאמה מדויקת ומנומקת.
+תפקידך להעריך את התאמת המועמד מול כל הקורסים המופיעים בקטלוג שלמטה ולהחזיר את כל הקורסים שהוערכו בתוך אובייקט JSON.
 
-קטלוג הקורסים הפעילים:
+קטלוג הקורסים:
 {courses_catalog}
 
-הנחיות קריטיות (חובה להקפיד ב-100%):
-1. החזר אך ורק אובייקט JSON תקין, ללא שום טקסט או Markdown מסביב.
-2. חוק מועדי הרשמה: אל תמליץ לעולם על קורס שתאריך הפתיחה שלו עבר את {cutoff_str}, או שמוגדר כ'ללא צפי' / 'הרשמה סגורה'.
-3. החזר קורסים מומלצים מבין הקורסים הפעילים בלבד שיש להם מועד פתיחה עתידי ורלוונטי.
-4. "ציון התאמה" חייב להיות מספר שלם בין 0 ל-100.
-5. השתמש אך ורק בלינקים כפי שמופיעים בקטלוג (תמיד עם https://).
-6. כל הנימוקים בעברית מקצועית, בגוף שלישי ("המועמד").
-
-מבנה הפלט:
+הנחיות קריטיות לקביעת ציונים ופסילות:
+1. חוק 14 הימים וקורסים ללא צפי (חוק פסילה קשיח):
+   - כל קורס שמסומן ב'סטטוס פתיחה: פג תוקף' או שתאריך פתיחתו עבר את {cutoff_str} — חייב לקבל ציון התאמה 0!
+   - כל קורס שמסומן ב'סטטוס פתיחה: ללא צפי פתיחה' — חייב לקבל ציון התאמה 0!
+   - עבור קורסים אלה יש לכתוב נימוק ברור בעברית שמתחיל במילים: "נפסל: מועד הפתיחה חלף וההרשמה הסתיימה" או "נפסל: אין כרגע מועד פתיחה צפוי לקורס".
+2. חוק תנאי קבלה:
+   - אם מועמד לא עומד בדרישות מהותיות של קורס (למשל נדרש תואר הנדסי ראשון ולמועמד אין) — הקורס יקבל ציון 0 עם נימוק מתאים.
+3. קורסים מומלצים:
+   - קורסים שמועד פתיחתם עתידי/פעיל והמועמד מתאים להם יקבלו ציון התאמה גבוה (בין 50 ל-100).
+4. חובה להחזיר JSON תקין ללא Markdown:
 {{
   "results": [
     {{
-      "שם הקורס": "שם הקורס",
-      "ציון התאמה": 95,
-      "תאריך התחלה": "תאריך",
-      "קמפוס": "קמפוס",
-      "נימוק": "הסבר מפורט",
+      "שם הקורס": "שם הקורס מתוך הקטלוג",
+      "ציון התאמה": 0,
+      "תאריך התחלה": "תאריך או לא צוין",
+      "קמפוס": "חיפה / שרונה",
+      "נימוק": "נימוק בעברית",
       "לינק לעמוד התכנית": "https://..."
     }}
   ]
