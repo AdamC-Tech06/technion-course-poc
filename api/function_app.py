@@ -17,7 +17,9 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
-DATE_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
+# תופס תאריכים רגילים (DD/MM/YYYY) וגם תאריכי Excel הפוכים (YYYY-MM-DD)
+DATE_DMY_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
+DATE_YMD_PATTERN = re.compile(r'\b(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})\b')
 
 
 def clean_env(val: str) -> str:
@@ -26,11 +28,29 @@ def clean_env(val: str) -> str:
     return re.sub(r'[^\x21-\x7E]', '', val)
 
 
-def extract_dates_from_text(text: str) -> list:
-    if not text:
+def extract_dates_from_value(val) -> list:
+    """מחלץ תאריכים גם מאובייקט datetime של Excel וגם מטקסט בכל פורמט"""
+    if not val:
         return []
+    if isinstance(val, datetime):
+        return [val]
+
+    text = str(val)
     parsed_dates = []
-    for match in DATE_PATTERN.finditer(str(text)):
+
+    # בדיקה ראשונה: פורמט YYYY-MM-DD (נפוץ בהמרת תאי אקסל)
+    for match in DATE_YMD_PATTERN.finditer(text):
+        year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+        try:
+            parsed_dates.append(datetime(year, month, day))
+        except ValueError:
+            continue
+
+    if parsed_dates:
+        return parsed_dates
+
+    # בדיקה שנייה: פורמט DD/MM/YYYY או DD.MM.YY
+    for match in DATE_DMY_PATTERN.finditer(text):
         day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
         if year < 100:
             year += 2000
@@ -38,31 +58,44 @@ def extract_dates_from_text(text: str) -> list:
             parsed_dates.append(datetime(year, month, day))
         except ValueError:
             continue
+
     return parsed_dates
 
 
-def check_course_date_status(row: dict, date_columns: list, cutoff_date: datetime) -> str:
+def format_cell_display(val) -> str:
+    """ממיר ערך תא לתצוגה נקייה (אם זה תאריך אקסל, מציג DD/MM/YYYY)"""
+    if val is None:
+        return ""
+    if isinstance(val, datetime):
+        return val.strftime("%d/%m/%Y")
+    text = str(val).strip()
+    # ניקוי 00:00:00 מתאריכי אקסל שהומרו למחרוזת
+    text = re.sub(r'(\d{4}-\d{2}-\d{2})\s+00:00:00', r'\1', text)
+    return text
+
+
+def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: datetime) -> str:
     for col in date_columns:
-        val = str(row.get(col, "")).strip()
+        val = str(raw_row.get(col, "")).strip()
         if "ללא צפי" in val or "לא ידוע" in val:
             return "NO_SCHEDULE"
 
     found_dates = []
     for col in date_columns:
-        cell_val = str(row.get(col, "")).strip()
+        cell_val = raw_row.get(col)
         if cell_val:
-            found_dates.extend(extract_dates_from_text(cell_val))
+            found_dates.extend(extract_dates_from_value(cell_val))
 
     if not found_dates:
-        for col, val in row.items():
+        for col, val in raw_row.items():
             if any(k in col for k in ["פתיחה", "התחלה", "מועד", "תאריך"]):
-                found_dates.extend(extract_dates_from_text(str(val)))
+                found_dates.extend(extract_dates_from_value(val))
 
     if found_dates:
         if all(d < cutoff_date for d in found_dates):
             return "EXPIRED"
 
-    all_text = " ".join(str(v) for v in row.values())
+    all_text = " ".join(str(v) for v in raw_row.values() if v is not None)
     deadline_match = re.search(r'הרשמה.*?עד\s*(\d{1,2})[/.](\d{1,2})', all_text)
     if deadline_match:
         d_day, d_month = int(deadline_match.group(1)), int(deadline_match.group(2))
@@ -77,7 +110,7 @@ def check_course_date_status(row: dict, date_columns: list, cutoff_date: datetim
 
 
 def extract_user_keywords(req_body: dict) -> set:
-    """מחלץ מילות מפתח מתשובות המועמד לצורך סינון ראשוני מהיר"""
+    """מחלץ מילות מפתח ושורשים מתשובות המועמד לצורך סינון ראשוני מדויק"""
     form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
     raw_tokens = []
     for k, v in form_data.items():
@@ -87,17 +120,24 @@ def extract_user_keywords(req_body: dict) -> set:
     full_text = " ".join(raw_tokens)
     words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', full_text))
 
-    # הרחבת מילות מפתח נפוצות דו-לשוניות
     synonym_map = {
+        "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט"},
+        "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט"},
+        "אתרי": {"full", "stack", "פיתוח", "אתרים", "בניית", "web", "tcwd"},
+        "full": {"stack", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd"},
+        "stack": {"full", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd"},
+        "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות", "אתרי"},
+        "תכנות": {"full", "stack", "פיתוח", "תוכנה", "python", "web"},
         "ai": {"בינה", "מלאכותית", "generative", "llm", "machine", "learning"},
-        "בינה": {"ai", "llm", "generative", "דאטה", "data"},
-        "full": {"stack", "פיתוח", "אתרים", "web", "תוכנה"},
-        "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות"},
+        "בינה": {"ai", "llm", "generative", "דאטה", "data", "עסקית", "bi"},
         "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה"},
         "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט"},
-        "סייבר": {"cyber", "אבטחת", "מידע", "רשתות"},
+        "סייבר": {"cyber", "אבטחת", "מידע", "רשתות", "מיישמי"},
         "cyber": {"סייבר", "אבטחת", "מידע"},
-        "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ"},
+        "qa": {"בדיקות", "בודקי", "תוכנה", "איכות"},
+        "בדיקות": {"qa", "בודקי", "תוכנה", "איכות"},
+        "מוצר": {"product", "management", "מאפיינים"},
+        "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ", "דירקטורים"},
         "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי"},
     }
     expanded = set(words)
@@ -107,11 +147,22 @@ def extract_user_keywords(req_body: dict) -> set:
     return expanded
 
 
+def get_course_name_from_row(row: dict, clean_headers: list) -> str:
+    """מזהה את שם הקורס גם אם כותרת העמודה משתנה בין הלשוניות"""
+    priority_keys = ["שם הקורס", "שם התוכנית", "שם התכנית", "שם תוכנית", "שם קורס", "הכשרה", "תוכנית"]
+    for pk in priority_keys:
+        if row.get(pk):
+            return row[pk]
+    for h in clean_headers:
+        if ("שם" in h or "קורס" in h or "תוכנית" in h or "תכנית" in h) and row.get(h):
+            # מוודא שלא לוקח בטעות עמודת מק"ט או לינק
+            val = row[h]
+            if not val.startswith("http") and not val.isdigit():
+                return val
+    return ""
+
+
 def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
-    """
-    טוען את כל 9 הלשוניות, מסנן קורסים פגי-תוקף, ומחזיר אך ורק את 10 הקורסים
-    הרלוונטיים ביותר כדי להישאר מתחת למגבלת ה-7,000 טוקנים של Groq.
-    """
     sheet_id = "1emkWYVjlrhC0m67gz7b3MUXzsG3RtlX-kbg8eNvzBtc"
     excel_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
@@ -146,23 +197,25 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 if not any(row_vals):
                     continue
 
-                row = {}
+                raw_row = {}
+                str_row = {}
                 for idx, col_name in enumerate(headers):
                     if col_name and idx < len(row_vals):
-                        val = row_vals[idx]
-                        row[col_name] = str(val).strip() if val is not None else ""
+                        raw_val = row_vals[idx]
+                        raw_row[col_name] = raw_val
+                        str_row[col_name] = format_cell_display(raw_val)
 
-                course_name = row.get("שם הקורס") or row.get("שם תוכנית") or row.get("שם התכנית") or ""
+                course_name = get_course_name_from_row(str_row, clean_headers)
                 if not course_name:
                     continue
 
-                status = check_course_date_status(row, date_columns, cutoff_date)
+                status = check_course_date_status(raw_row, date_columns, cutoff_date)
 
                 link_val = "לא זמין"
                 campus_val = "לא צוין"
                 date_val = "לא צוין"
                 for col in clean_headers:
-                    v = row.get(col, "")
+                    v = str_row.get(col, "")
                     if not v:
                         continue
                     if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and v != "לא זמין":
@@ -189,17 +242,15 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                         })
                     continue
 
-                # חישוב ציון רלוונטיות מילולי מהיר לסינון Top 10
-                searchable_blob = f"{sheet_name} {course_name} " + " ".join(
-                    row.get(c, "") for c in clean_headers
-                    if any(k in c for k in ["תחום", "תיאור", "אודות", "תנאי", "מתכונת"])
-                )
-                blob_lower = searchable_blob.lower()
-                # משקל גבוה יותר להתאמה בשם הקורס או שם הגיליון
+                # ניקוד התאמה מילולי: משקל גבוה להתאמה בשם הקורס או בלשונית
                 title_lower = f"{sheet_name} {course_name}".lower()
-                score = sum(3 for kw in user_keywords if kw in title_lower) + sum(1 for kw in user_keywords if kw in blob_lower)
+                desc_lower = " ".join(
+                    str_row.get(c, "") for c in clean_headers
+                    if any(k in c for k in ["תחום", "תיאור", "אודות", "תנאי", "מתכונת"])
+                ).lower()
 
-                # בניית בלוק תמציתי רק עם השדות החיוניים (חיסכון אדיר בטוקנים)
+                score = sum(5 for kw in user_keywords if kw in title_lower) + sum(1 for kw in user_keywords if kw in desc_lower)
+
                 compact_lines = [
                     f"תחום/גיליון: {sheet_name}",
                     f"שם הקורס: {course_name}",
@@ -209,7 +260,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 ]
                 for col in clean_headers:
                     if any(k in col for k in ["תיאור", "אודות", "תנאי קבלה", "מתכונת"]):
-                        val = row.get(col, "")
+                        val = str_row.get(col, "")
                         if val:
                             compact_lines.append(f"{col}: {val[:220]}")
 
@@ -218,7 +269,6 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
     except Exception as e:
         logging.error(f"Failed to load courses workbook: {e}")
 
-    # מיון לפי רלוונטיות ובחירת 10 המובילים בלבד (שומר על הפרומפט מתחת ל-3,000 טוקנים)
     active_courses.sort(key=lambda x: x[0], reverse=True)
     top_blocks = [item[1] for item in active_courses[:10]]
 
@@ -283,7 +333,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 חוקים:
 1. החזר אך ורק JSON תקין במבנה:
 {{"results": [{{"שם הקורס": "...", "ציון התאמה": 90, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
-2. בחר 3-5 קורסים מתאימים (ציון 65-100). אם מועמד לא עומד בתנאי קבלה מהותי של קורס שבחרת לבחון, תן ציון 0 וכתוב "נפסל: ...".
+2. בחר 3-5 קורסים מתאימים (ציון 65-100) בהתאם לתחום העניין ולרקע של המועמד. אם מועמד לא עומד בתנאי קבלה מהותי של קורס שבחרת לבחון, תן ציון 0 וכתוב "נפסל: ...".
 3. השתמש רק בקורסים ובלינקים מהרשימה למעלה (תמיד עם https://). כתוב נימוק תמציתי ומקצועי בעברית בגוף שלישי."""
 
         messages = [
