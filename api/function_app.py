@@ -20,7 +20,12 @@ CORS_HEADERS = {
 DATE_DMY_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
 DATE_YMD_PATTERN = re.compile(r'\b(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})\b')
 
-# שדות של פרטים אישיים או כלליים שלא אמורים להשפיע על דירוג תחום הקורס
+HEADER_KEYWORDS = [
+    "שם הקורס", "שם התוכנית", "שם התכנית", "שם תוכנית",
+    "פתיחה", "התחלה", "מועד", "תנאי קבלה", "אודות", "תיאור",
+    "קמפוס", "מק\"ט", "מקט", "דפי מידע", "לינק", "רכזת", "עלות"
+]
+
 NON_TOPIC_KEYS = {
     "firstName", "lastName", "first_name", "last_name", "name",
     "email", "phone", "tel", "mobile", "id", "timestamp", "submittedAt",
@@ -28,7 +33,6 @@ NON_TOPIC_KEYS = {
     "start_time", "preferred_campus", "comments"
 }
 
-# מילון התאמות דו-לשוני מלא לכל תחומי הלימוד בטכניון
 SYNONYM_MAP = {
     "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט", "פול", "סטאק"},
     "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט", "פול", "סטאק"},
@@ -69,6 +73,24 @@ def clean_env(val: str) -> str:
     if not val:
         return ""
     return re.sub(r'[^\x21-\x7E]', '', val)
+
+
+def find_header_row_index(rows: list) -> int:
+    """מאתר אוטומטית באיזו שורה נמצאות כותרות העמודות בכל לשונית"""
+    best_idx = 0
+    best_hits = 0
+    for idx, r in enumerate(rows[:10]):
+        if not r:
+            continue
+        cells_text = [str(c).strip() for c in r if c is not None and str(c).strip()]
+        hits = sum(
+            1 for cell in cells_text
+            if any(kw in cell for kw in HEADER_KEYWORDS)
+        )
+        if hits > best_hits:
+            best_hits = hits
+            best_idx = idx
+    return best_idx if best_hits >= 2 else 0
 
 
 def extract_dates_from_value(val) -> list:
@@ -156,10 +178,6 @@ def expand_keywords(words: set) -> set:
 
 
 def extract_topic_and_general_keywords(req_body: dict) -> tuple[set, set, str]:
-    """
-    מפריד באופן חכם בין שדות התחום/התמחות שבחר המועמד לבין שדות רקע כלליים
-    כדי לתת עדיפות מוחלטת לקורסים בתחום המבוקש.
-    """
     form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
     topic_tokens = []
     general_tokens = []
@@ -220,7 +238,8 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
             if not rows or len(rows) < 2:
                 continue
 
-            headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+            header_idx = find_header_row_index(rows)
+            headers = [str(cell).strip() if cell is not None else "" for cell in rows[header_idx]]
             clean_headers = [h for h in headers if h]
 
             date_columns = [
@@ -228,7 +247,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 if any(k in h for k in ["פתיחה", "התחלה", "מועד", "תאריך", "ת."])
             ]
 
-            for row_vals in rows[1:]:
+            for row_vals in rows[header_idx + 1:]:
                 if not any(row_vals):
                     continue
 
@@ -241,7 +260,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                         str_row[col_name] = format_cell_display(raw_val)
 
                 course_name = get_course_name_from_row(str_row, clean_headers)
-                if not course_name:
+                if not course_name or course_name in ("שם הקורס", "שם התוכנית", "שם התכנית", "שם תוכנית"):
                     continue
 
                 status = check_course_date_status(raw_row, date_columns, cutoff_date)
@@ -263,7 +282,6 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 course_title_lower = course_name.lower()
                 sheet_lower = sheet_name.lower()
 
-                # חישוב ניקוד רלוונטיות לתחום שבחר המועמד
                 topic_match_score = (
                     sum(30 for kw in topic_kw if kw in course_title_lower)
                     + sum(12 for kw in topic_kw if kw in sheet_lower)
@@ -297,7 +315,6 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     + sum(1 for kw in general_kw if kw in desc_lower)
                 )
 
-                # דחיסה חכמה שמאפשרת להכניס עד 25 קורסים בלי לחרוג ממגבלת הטוקנים של Groq
                 compact_lines = [
                     f"קורס: {course_name} | קטגוריה: {sheet_name} | פתיחה: {date_val} | קמפוס: {campus_val} | לינק: {link_val}"
                 ]
@@ -316,11 +333,9 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
     except Exception as e:
         logging.error(f"Failed to load courses workbook: {e}")
 
-    # מיון הקורסים הפעילים לפי רלוונטיות לבחירת המועמד ובחירת 24 המובילים
     active_courses.sort(key=lambda x: x[0], reverse=True)
     top_blocks = [item[1] for item in active_courses[:24]]
 
-    # מיון הקורסים שנפסלו כך שיוצגו קורסים שנפסלו מהתחום של המועמד (אם יש כאלה)
     expired_samples.sort(key=lambda x: x[0], reverse=True)
     top_expired = [item[1] for item in expired_samples[:3]]
 
@@ -386,8 +401,10 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 הנחיות קריטיות (חובה להקפיד ב-100%):
 1. החזר אך ורק אובייקט JSON תקין במבנה:
 {{"results": [{{"שם הקורס": "...", "ציון התאמה": 92, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
-2. התאמת תחום והתמחות (קריטי!): המלץ בראש הרשימה (ציון 70-100) אך ורק על 3-5 קורסים שתואמים ישירות לתחום העניין ולהתמחות שהמועמד בחר בשאלון! אל תמליץ על קורסים מתחום אחר (כמו ניהול או עיצוב אם המועמד ביקש פיתוח אתרים/סייבר/דאטה).
-3. פסילת תנאי קבלה: אם יש ברשימה קורס מהתחום המבוקש שהמועמד אינו עומד בתנאי הקבלה שלו (למשל חסר תואר אקדמי נדרש או שנות ניסיון), כלול אותו עם "ציון התאמה": 0 ונימוק שמתחיל במילה "נפסל: ...".
+2. בחירת מומלצים (חובה להחזיר 3 עד 5 קורסים מומלצים עם ציון 65-100):
+   - תן עדיפות עליונה (ציון 85-100) לקורסים שתואמים ישירות להתמחות הספציפית שהמועמד בחר בשאלון.
+   - אם יש פחות מ-3 קורסים בהתמחות הספציפית, השלם את הרשימה ל-3 עד 5 קורסים מתוך הקורסים הקרובים ביותר לתחום העניין הכללי של המועמד (ציון 65-80).
+3. פסילת תנאי קבלה: אם יש ברשימה קורס מהתחום המבוקש שהמועמד אינו עומד בתנאי הקבלה שלו, כלול אותו עם "ציון התאמה": 0 ונימוק שמתחיל במילה "נפסל: ...".
 4. השתמש אך ורק בשמות הקורסים, התאריכים והלינקים המדויקים מהרשימה למעלה. כתוב נימוק מקצועי בעברית בגוף שלישי."""
 
         messages = [
@@ -426,7 +443,6 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         parsed = extract_json_object(raw_content)
         raw_results = parsed.get("results", [])
 
-        # אימות וניקוי פלט ה-AI (Post-Validation)
         validated_results = []
         existing_names = set()
 
@@ -443,7 +459,6 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             except Exception:
                 score_val = 0
 
-            # אם המודל כתב בנימוק "נפסל", מוודאים שהציון הוא 0 כדי שלא יופיע בטבלת המומלצים
             if reason_str.startswith("נפסל") or "אינו מתאים" in reason_str:
                 score_val = 0
 
@@ -461,13 +476,11 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             })
             existing_names.add(c_name)
 
-        # צירוף קורסים שנפסלו בגלל תאריך/ללא צפי (מותאמים לתחום המועמד)
         for exp in expired_samples:
             if exp["שם הקורס"] not in existing_names:
                 validated_results.append(exp)
                 existing_names.add(exp["שם הקורס"])
 
-        # מיון סופי מהציון הגבוה לנמוך
         validated_results.sort(key=lambda x: x["ציון התאמה"], reverse=True)
 
         return func.HttpResponse(
