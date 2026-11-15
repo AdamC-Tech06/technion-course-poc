@@ -20,43 +20,48 @@ CORS_HEADERS = {
 DATE_DMY_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
 DATE_YMD_PATTERN = re.compile(r'\b(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})\b')
 
-# שדות הבחירה הספציפיים בטופס שמייצגים את תחום ההתעניינות המרכזי של המועמד
-INTEREST_FIELDS = [
-    "field",
-    "data_programming",
-    "data_interest",
-    "ai_interest",
-    "cyber_technical",
-    "cyber_interest",
-    "pm_experience",
-    "digital_interest",
-    "business_interest",
-]
+# שדות של פרטים אישיים או כלליים שלא אמורים להשפיע על דירוג תחום הקורס
+NON_TOPIC_KEYS = {
+    "firstName", "lastName", "first_name", "last_name", "name",
+    "email", "phone", "tel", "mobile", "id", "timestamp", "submittedAt",
+    "education", "experience", "english_level", "study_mode",
+    "start_time", "preferred_campus", "comments"
+}
 
+# מילון התאמות דו-לשוני מלא לכל תחומי הלימוד בטכניון
 SYNONYM_MAP = {
-    "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט"},
-    "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט"},
+    "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט", "פול", "סטאק"},
+    "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט", "פול", "סטאק"},
     "אתרי": {"full", "stack", "פיתוח", "אתרים", "בניית", "web", "tcwd", "אינטרנט"},
-    "full": {"stack", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט"},
-    "stack": {"full", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט"},
-    "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות", "אתרי", "אינטרנט"},
-    "תכנות": {"full", "stack", "פיתוח", "תוכנה", "python", "web"},
+    "full": {"stack", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט", "פול", "סטאק"},
+    "stack": {"full", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט", "פול", "סטאק"},
+    "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות", "אתרי", "אינטרנט", "tcwd"},
+    "תכנות": {"full", "stack", "פיתוח", "תוכנה", "python", "web", "מידע"},
     "ai": {"בינה", "מלאכותית", "generative", "llm", "machine", "learning"},
-    "בינה": {"ai", "llm", "generative", "דאטה", "data", "עסקית", "bi"},
-    "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה"},
-    "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט"},
-    "אנליסט": {"analyst", "דאטה", "data", "bi", "נתונים"},
-    "bi": {"בינה", "עסקית", "דאטה", "data", "analyst"},
-    "סייבר": {"cyber", "אבטחת", "מידע", "רשתות", "מיישמי"},
+    "בינה": {"ai", "llm", "generative", "דאטה", "data", "עסקית", "bi", "מלאכותית"},
+    "מלאכותית": {"ai", "llm", "generative", "בינה"},
+    "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה", "big"},
+    "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט", "big"},
+    "אנליסט": {"analyst", "דאטה", "data", "bi", "נתונים", "ניתוח"},
+    "bi": {"בינה", "עסקית", "דאטה", "data", "analyst", "נתונים"},
+    "סייבר": {"cyber", "אבטחת", "מידע", "רשתות", "מיישמי", "soc", "הגנה"},
     "cyber": {"סייבר", "אבטחת", "מידע", "מיישמי"},
-    "qa": {"בדיקות", "בודקי", "תוכנה", "איכות", "tcqa"},
+    "אבטחת": {"סייבר", "cyber", "מידע", "מיישמי"},
+    "qa": {"בדיקות", "בודקי", "תוכנה", "איכות", "tcqa", "אוטומציה"},
     "בדיקות": {"qa", "בודקי", "תוכנה", "איכות", "tcqa"},
+    "בודקי": {"qa", "בדיקות", "תוכנה", "tcqa"},
     "מוצר": {"product", "management", "מאפיינים", "ניתוח", "מערכות"},
-    "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ", "דירקטורים", "pmp"},
-    "פרויקטים": {"ניהול", "pmp", "מערכות", "agile"},
-    "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי", "מוסמך"},
-    "הנדסה": {"מהנדסים", "me", "תואר", "שני", "מערכות", "אזרחית"},
-    "שיווק": {"דיגיטלי", "digital", "מכירות", "עסקי"},
+    "product": {"מוצר", "management", "ניהול"},
+    "ניתוח": {"מערכות", "מידע", "אנליסט", "דאטה", "data"},
+    "מערכות": {"ניתוח", "מידע", "הנדסת", "מנמ", "cio"},
+    "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ", "דירקטורים", "pmp", "בכיר"},
+    "פרויקטים": {"ניהול", "pmp", "מערכות", "agile", "scrum"},
+    "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי", "מוסמך", "תארים"},
+    "הנדסה": {"מהנדסים", "me", "תואר", "שני", "מערכות", "אזרחית", "עירונית", "ביו"},
+    "עיצוב": {"גרפי", "תעשייתי", "פנים", "אדריכלות", "ui", "ux", "דיגיטלי"},
+    "שיווק": {"דיגיטלי", "digital", "מכירות", "עסקי", "מסחר"},
+    "נדלן": {"מקרקעין", "שמאות", "בנייה", "mre"},
+    "מקרקעין": {"נדלן", "שמאות", "mre"},
 }
 
 
@@ -110,7 +115,7 @@ def format_cell_display(val) -> str:
 def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: datetime) -> str:
     for col in date_columns:
         val = str(raw_row.get(col, "")).strip()
-        if any(phrase in val for phrase in ["ללא צפי", "לא צפי", "לא ידוע", "טרם נקבע"]):
+        if any(phrase in val for phrase in ["ללא צפי", "לא צפי", "לא ידוע", "טרם נקבע", "אין צפי"]):
             return "NO_SCHEDULE"
 
     found_dates = []
@@ -142,7 +147,7 @@ def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: dat
     return "ACTIVE"
 
 
-def expand_words(words: set) -> set:
+def expand_keywords(words: set) -> set:
     expanded = set(words)
     for w in words:
         if w in SYNONYM_MAP:
@@ -150,29 +155,29 @@ def expand_words(words: set) -> set:
     return expanded
 
 
-def extract_user_keywords(req_body: dict) -> tuple[set, set]:
+def extract_topic_and_general_keywords(req_body: dict) -> tuple[set, set, str]:
     """
-    מחזיר שני סטים של מילות מפתח:
-    1. primary_keywords: מתוך שדות הבחירה של תחום העניין וההתמחות (בעלי משקל גבוה)
-    2. general_keywords: מתוך שאר שדות הטופס (רקע, יעדים, השכלה)
+    מפריד באופן חכם בין שדות התחום/התמחות שבחר המועמד לבין שדות רקע כלליים
+    כדי לתת עדיפות מוחלטת לקורסים בתחום המבוקש.
     """
     form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
-    primary_tokens = []
+    topic_tokens = []
     general_tokens = []
 
     for k, v in form_data.items():
         if not v or str(v).strip().lower() in ("null", "none", ""):
             continue
         val_str = str(v).lower()
-        if k in INTEREST_FIELDS:
-            primary_tokens.append(val_str)
-        else:
+        if k not in NON_TOPIC_KEYS:
+            topic_tokens.append(val_str)
+        elif k in ("current_field", "goals"):
             general_tokens.append(val_str)
 
-    primary_words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', " ".join(primary_tokens)))
+    topic_text = " ".join(topic_tokens)
+    topic_words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', topic_text))
     general_words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', " ".join(general_tokens)))
 
-    return expand_words(primary_words), expand_words(general_words)
+    return expand_keywords(topic_words), expand_keywords(general_words), topic_text
 
 
 def get_course_name_from_row(row: dict, clean_headers: list) -> str:
@@ -198,7 +203,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
 
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
-    primary_kw, general_kw = extract_user_keywords(req_body)
+    topic_kw, general_kw, topic_text = extract_topic_and_general_keywords(req_body)
 
     active_courses = []
     expired_samples = []
@@ -255,58 +260,72 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     elif any(k in col for k in ["פתיחה", "התחלה", "מועד"]):
                         date_val = v
 
+                course_title_lower = course_name.lower()
+                sheet_lower = sheet_name.lower()
+
+                # חישוב ניקוד רלוונטיות לתחום שבחר המועמד
+                topic_match_score = (
+                    sum(30 for kw in topic_kw if kw in course_title_lower)
+                    + sum(12 for kw in topic_kw if kw in sheet_lower)
+                )
+
                 if status in ("EXPIRED", "NO_SCHEDULE"):
-                    if len(expired_samples) < 3:
-                        reason = (
-                            "נפסל: מועד הפתיחה חלף (עברו מעל 14 יום) וההרשמה הסתיימה"
-                            if status == "EXPIRED"
-                            else "נפסל: אין כרגע מועד פתיחה צפוי לקורס"
-                        )
-                        expired_samples.append({
+                    reason = (
+                        "נפסל: מועד הפתיחה חלף (עברו מעל 14 יום) וההרשמה הסתיימה"
+                        if status == "EXPIRED"
+                        else "נפסל: אין כרגע מועד פתיחה צפוי לקורס"
+                    )
+                    expired_samples.append((
+                        topic_match_score,
+                        {
                             "שם הקורס": course_name,
                             "ציון התאמה": 0,
                             "תאריך התחלה": date_val,
                             "קמפוס": campus_val,
                             "נימוק": reason,
                             "לינק לעמוד התכנית": link_val
-                        })
+                        }
+                    ))
                     continue
 
-                title_lower = f"{sheet_name} {course_name}".lower()
                 desc_lower = " ".join(str_row.values()).lower()
 
-                # ניקוד אוניברסלי: התאמה ישירה לבחירת תחום ההתעניינות של המועמד מקבלת עדיפות עליונה בכל גיליון
-                score = (
-                    sum(15 for kw in primary_kw if kw in title_lower)
-                    + sum(4 for kw in primary_kw if kw in desc_lower)
-                    + sum(3 for kw in general_kw if kw in title_lower)
+                total_score = (
+                    topic_match_score
+                    + sum(3 for kw in topic_kw if kw in desc_lower)
+                    + sum(4 for kw in general_kw if kw in course_title_lower)
                     + sum(1 for kw in general_kw if kw in desc_lower)
                 )
 
+                # דחיסה חכמה שמאפשרת להכניס עד 25 קורסים בלי לחרוג ממגבלת הטוקנים של Groq
                 compact_lines = [
-                    f"תחום/גיליון: {sheet_name}",
-                    f"שם הקורס: {course_name}",
-                    f"תאריך פתיחה: {date_val}",
-                    f"קמפוס: {campus_val}",
-                    f"לינק: {link_val}",
+                    f"קורס: {course_name} | קטגוריה: {sheet_name} | פתיחה: {date_val} | קמפוס: {campus_val} | לינק: {link_val}"
                 ]
                 for col in clean_headers:
-                    if any(k in col for k in ["תיאור", "אודות", "תנאי קבלה", "מתכונת"]):
+                    if any(k in col for k in ["תנאי קבלה", "קהל יעד", "דרישות"]):
                         val = str_row.get(col, "")
                         if val:
-                            compact_lines.append(f"{col}: {val[:200]}")
+                            compact_lines.append(f"תנאי קבלה: {val[:140]}")
+                    elif any(k in col for k in ["תיאור", "אודות", "מתכונת"]):
+                        val = str_row.get(col, "")
+                        if val:
+                            compact_lines.append(f"{col}: {val[:120]}")
 
-                active_courses.append((score, "\n".join(compact_lines)))
+                active_courses.append((total_score, "\n".join(compact_lines)))
 
     except Exception as e:
         logging.error(f"Failed to load courses workbook: {e}")
 
+    # מיון הקורסים הפעילים לפי רלוונטיות לבחירת המועמד ובחירת 24 המובילים
     active_courses.sort(key=lambda x: x[0], reverse=True)
-    # לקיחת 12 המועמדים המובילים (נשאר בבטחה מתחת למגבלת ה-7,000 טוקנים של Groq)
-    top_blocks = [item[1] for item in active_courses[:12]]
+    top_blocks = [item[1] for item in active_courses[:24]]
 
-    catalog_text = "\n\n" + ("\n" + "-" * 30 + "\n\n").join(top_blocks)
-    return catalog_text, expired_samples
+    # מיון הקורסים שנפסלו כך שיוצגו קורסים שנפסלו מהתחום של המועמד (אם יש כאלה)
+    expired_samples.sort(key=lambda x: x[0], reverse=True)
+    top_expired = [item[1] for item in expired_samples[:3]]
+
+    catalog_text = "\n\n".join(top_blocks)
+    return catalog_text, top_expired
 
 
 def extract_json_object(raw_text: str) -> dict:
@@ -359,19 +378,21 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
         client = OpenAI(api_key=api_key, base_url=base_url)
 
-        system_prompt = f"""אתה יועץ לימודים מומחה של בית הספר ללימודי המשך של הטכניון. התאריך היום: {today_str}.
-התאם את פרטי המועמד לרשימת הקורסים הפעילים הבאה:
+        system_prompt = f"""אתה יועץ לימודים אקדמי של בית הספר ללימודי המשך של הטכניון. התאריך היום: {today_str}.
+התאם את פרטי המועמד לרשימת הקורסים הפעילים הבאה (הרשימה מדורגת מהרלוונטי ביותר):
+
 {courses_catalog}
 
-חוקים:
-1. החזר אך ורק JSON תקין במבנה:
-{{"results": [{{"שם הקורס": "...", "ציון התאמה": 90, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
-2. בחר 3-5 קורסים מתאימים (ציון 65-100) בהתאם לתחום העניין ולרקע של המועמד. אם מועמד לא עומד בתנאי קבלה מהותי של קורס שבחרת לבחון, תן ציון 0 וכתוב "נפסל: ...".
-3. השתמש רק בקורסים ובלינקים מהרשימה למעלה (תמיד עם https://). כתוב נימוק תמציתי ומקצועי בעברית בגוף שלישי."""
+הנחיות קריטיות (חובה להקפיד ב-100%):
+1. החזר אך ורק אובייקט JSON תקין במבנה:
+{{"results": [{{"שם הקורס": "...", "ציון התאמה": 92, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
+2. התאמת תחום והתמחות (קריטי!): המלץ בראש הרשימה (ציון 70-100) אך ורק על 3-5 קורסים שתואמים ישירות לתחום העניין ולהתמחות שהמועמד בחר בשאלון! אל תמליץ על קורסים מתחום אחר (כמו ניהול או עיצוב אם המועמד ביקש פיתוח אתרים/סייבר/דאטה).
+3. פסילת תנאי קבלה: אם יש ברשימה קורס מהתחום המבוקש שהמועמד אינו עומד בתנאי הקבלה שלו (למשל חסר תואר אקדמי נדרש או שנות ניסיון), כלול אותו עם "ציון התאמה": 0 ונימוק שמתחיל במילה "נפסל: ...".
+4. השתמש אך ורק בשמות הקורסים, התאריכים והלינקים המדויקים מהרשימה למעלה. כתוב נימוק מקצועי בעברית בגוף שלישי."""
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "פרטי המועמד:\n" + json.dumps(req_body, ensure_ascii=False)}
+            {"role": "user", "content": "נתוני השאלון של המועמד:\n" + json.dumps(req_body, ensure_ascii=False)}
         ]
 
         candidate_models = list(dict.fromkeys([
@@ -390,7 +411,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
                 response = client.chat.completions.create(
                     model=m_name,
                     messages=messages,
-                    temperature=0.3
+                    temperature=0.2
                 )
                 if response and response.choices and response.choices[0].message.content:
                     break
@@ -403,17 +424,54 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 
         raw_content = response.choices[0].message.content
         parsed = extract_json_object(raw_content)
-        results_list = parsed.get("results", [])
+        raw_results = parsed.get("results", [])
 
-        existing_names = {r.get("שם הקורס") for r in results_list}
+        # אימות וניקוי פלט ה-AI (Post-Validation)
+        validated_results = []
+        existing_names = set()
+
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            c_name = str(item.get("שם הקורס", "")).strip()
+            if not c_name or c_name in existing_names:
+                continue
+
+            reason_str = str(item.get("נימוק", "")).strip()
+            try:
+                score_val = int(float(item.get("ציון התאמה", 0)))
+            except Exception:
+                score_val = 0
+
+            # אם המודל כתב בנימוק "נפסל", מוודאים שהציון הוא 0 כדי שלא יופיע בטבלת המומלצים
+            if reason_str.startswith("נפסל") or "אינו מתאים" in reason_str:
+                score_val = 0
+
+            link_str = str(item.get("לינק לעמוד התכנית", "לא זמין")).strip()
+            if link_str and link_str != "לא זמין" and not link_str.startswith("http"):
+                link_str = "https://" + link_str
+
+            validated_results.append({
+                "שם הקורס": c_name,
+                "ציון התאמה": score_val,
+                "תאריך התחלה": str(item.get("תאריך התחלה", "לא צוין")).strip(),
+                "קמפוס": str(item.get("קמפוס", "לא צוין")).strip(),
+                "נימוק": reason_str,
+                "לינק לעמוד התכנית": link_str
+            })
+            existing_names.add(c_name)
+
+        # צירוף קורסים שנפסלו בגלל תאריך/ללא צפי (מותאמים לתחום המועמד)
         for exp in expired_samples:
             if exp["שם הקורס"] not in existing_names:
-                results_list.append(exp)
+                validated_results.append(exp)
+                existing_names.add(exp["שם הקורס"])
 
-        final_payload = {"results": results_list}
+        # מיון סופי מהציון הגבוה לנמוך
+        validated_results.sort(key=lambda x: x["ציון התאמה"], reverse=True)
 
         return func.HttpResponse(
-            json.dumps(final_payload, ensure_ascii=False),
+            json.dumps({"results": validated_results}, ensure_ascii=False),
             status_code=200,
             headers=CORS_HEADERS,
             mimetype="application/json"
