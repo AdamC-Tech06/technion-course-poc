@@ -76,18 +76,50 @@ def check_course_date_status(row: dict, date_columns: list, cutoff_date: datetim
     return "ACTIVE"
 
 
-def load_courses_catalog() -> tuple[str, list]:
+def extract_user_keywords(req_body: dict) -> set:
+    """מחלץ מילות מפתח מתשובות המועמד לצורך סינון ראשוני מהיר"""
+    form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
+    raw_tokens = []
+    for k, v in form_data.items():
+        if v and str(v).strip().lower() not in ("null", "none", ""):
+            raw_tokens.append(str(v).lower())
+
+    full_text = " ".join(raw_tokens)
+    words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', full_text))
+
+    # הרחבת מילות מפתח נפוצות דו-לשוניות
+    synonym_map = {
+        "ai": {"בינה", "מלאכותית", "generative", "llm", "machine", "learning"},
+        "בינה": {"ai", "llm", "generative", "דאטה", "data"},
+        "full": {"stack", "פיתוח", "אתרים", "web", "תוכנה"},
+        "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות"},
+        "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה"},
+        "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט"},
+        "סייבר": {"cyber", "אבטחת", "מידע", "רשתות"},
+        "cyber": {"סייבר", "אבטחת", "מידע"},
+        "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ"},
+        "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי"},
+    }
+    expanded = set(words)
+    for w in words:
+        if w in synonym_map:
+            expanded.update(synonym_map[w])
+    return expanded
+
+
+def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
     """
-    מחזיר:
-    1. טקסט מרוכז של הקורסים הפעילים בלבד (לחסכון בטוקנים ומניעת חריגת מגבלה ב-Groq)
-    2. רשימה של עד 3 קורסים שנפסלו אוטומטית בגלל תאריך/ללא צפי להצגה בטבלת הנפסלים
+    טוען את כל 9 הלשוניות, מסנן קורסים פגי-תוקף, ומחזיר אך ורק את 10 הקורסים
+    הרלוונטיים ביותר כדי להישאר מתחת למגבלת ה-7,000 טוקנים של Groq.
     """
     sheet_id = "1emkWYVjlrhC0m67gz7b3MUXzsG3RtlX-kbg8eNvzBtc"
     excel_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
-    active_blocks = []
+    user_keywords = extract_user_keywords(req_body)
+
+    active_courses = []
     expired_samples = []
 
     try:
@@ -126,7 +158,6 @@ def load_courses_catalog() -> tuple[str, list]:
 
                 status = check_course_date_status(row, date_columns, cutoff_date)
 
-                # חילוץ קישור וקמפוס ותאריך גם עבור קורסים שנפסלו
                 link_val = "לא זמין"
                 campus_val = "לא צוין"
                 date_val = "לא צוין"
@@ -158,31 +189,44 @@ def load_courses_catalog() -> tuple[str, list]:
                         })
                     continue
 
-                # עבור קורסים פעילים בלבד - בניית בלוק תמציתי וברור
-                row_lines = [f"גיליון: {sheet_name}"]
-                for col in clean_headers:
-                    val = row.get(col, "")
-                    if val:
-                        if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and val != "לא זמין":
-                            if not val.startswith("http://") and not val.startswith("https://"):
-                                val = "https://" + val
-                        # קיצור שדות טקסט ארוכים מדי (כמו עלויות/תקנונים) כדי לא לחרוג ממכסת טוקנים
-                        if len(val) > 350:
-                            val = val[:350] + "..."
-                        row_lines.append(f"{col}: {val}")
+                # חישוב ציון רלוונטיות מילולי מהיר לסינון Top 10
+                searchable_blob = f"{sheet_name} {course_name} " + " ".join(
+                    row.get(c, "") for c in clean_headers
+                    if any(k in c for k in ["תחום", "תיאור", "אודות", "תנאי", "מתכונת"])
+                )
+                blob_lower = searchable_blob.lower()
+                # משקל גבוה יותר להתאמה בשם הקורס או שם הגיליון
+                title_lower = f"{sheet_name} {course_name}".lower()
+                score = sum(3 for kw in user_keywords if kw in title_lower) + sum(1 for kw in user_keywords if kw in blob_lower)
 
-                if row_lines:
-                    active_blocks.append("\n".join(row_lines))
+                # בניית בלוק תמציתי רק עם השדות החיוניים (חיסכון אדיר בטוקנים)
+                compact_lines = [
+                    f"תחום/גיליון: {sheet_name}",
+                    f"שם הקורס: {course_name}",
+                    f"תאריך פתיחה: {date_val}",
+                    f"קמפוס: {campus_val}",
+                    f"לינק: {link_val}",
+                ]
+                for col in clean_headers:
+                    if any(k in col for k in ["תיאור", "אודות", "תנאי קבלה", "מתכונת"]):
+                        val = row.get(col, "")
+                        if val:
+                            compact_lines.append(f"{col}: {val[:220]}")
+
+                active_courses.append((score, "\n".join(compact_lines)))
 
     except Exception as e:
         logging.error(f"Failed to load courses workbook: {e}")
 
-    catalog_text = "\n\n" + ("\n" + "-" * 40 + "\n\n").join(active_blocks)
+    # מיון לפי רלוונטיות ובחירת 10 המובילים בלבד (שומר על הפרומפט מתחת ל-3,000 טוקנים)
+    active_courses.sort(key=lambda x: x[0], reverse=True)
+    top_blocks = [item[1] for item in active_courses[:10]]
+
+    catalog_text = "\n\n" + ("\n" + "-" * 30 + "\n\n").join(top_blocks)
     return catalog_text, expired_samples
 
 
 def extract_json_object(raw_text: str) -> dict:
-    """מחלץ אובייקט JSON תקין גם אם מודל Reasoning הוסיף טקסט או בלוק קוד מסביב"""
     cleaned = raw_text.strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
@@ -227,49 +271,26 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     try:
-        courses_catalog, expired_samples = load_courses_catalog()
+        courses_catalog, expired_samples = load_filtered_courses_catalog(req_body)
         today_str = datetime.now().strftime("%d/%m/%Y")
 
         client = OpenAI(api_key=api_key, base_url=base_url)
 
-        system_prompt = f"""
-אתה יועץ לימודים ומנהל אקדמי מומחה של בית הספר ללימודי המשך של הטכניון.
-התאריך של היום: {today_str}.
-
-תפקידך לנתח את פרטי השאלון שמילא המועמד, להצליב אותם מול קטלוג הקורסים הפעילים שלהלן, ולהחזיר התאמה מדויקת ומנומקת.
-
-קטלוג הקורסים הפעילים (כל הקורסים כאן בתוקף):
+        system_prompt = f"""אתה יועץ לימודים מומחה של בית הספר ללימודי המשך של הטכניון. התאריך היום: {today_str}.
+התאם את פרטי המועמד לרשימת הקורסים הפעילים הבאה:
 {courses_catalog}
 
-הנחיות קריטיות (חובה להקפיד ב-100%):
-1. החזר אך ורק אובייקט JSON חוקי ותקני, ללא שום טקסט לפניו או אחריו.
-2. בחר 3 עד 5 קורסים מתאימים ביותר מתוך הקטלוג שלמעלה עבור המועמד (עם ציוני התאמה 65–100).
-3. אם מועמד אינו עומד בתנאי קבלה מהותי של קורס שבחרת לבחון — תן ציון 0 וכתוב נימוק שמתחיל ב"נפסל: ...".
-4. "ציון התאמה" חייב להיות מספר שלם (Integer) בין 0 ל-100.
-5. השתמש אך ורק בשמות הקורסים, תאריכי ההתחלה והלינקים שמופיעים בקטלוג שלמעלה (ודא קידומת https://).
-6. כתוב נימוק מקצועי, רהוט וחם בעברית בגוף שלישי ("המועמד").
-
-מבנה הפלט הנדרש:
-{{
-  "results": [
-    {{
-      "שם הקורס": "שם הקורס",
-      "ציון התאמה": 95,
-      "תאריך התחלה": "תאריך",
-      "קמפוס": "קמפוס",
-      "נימוק": "נימוק מקצועי בעברית",
-      "לינק לעמוד התכנית": "https://..."
-    }}
-  ]
-}}
-"""
+חוקים:
+1. החזר אך ורק JSON תקין במבנה:
+{{"results": [{{"שם הקורס": "...", "ציון התאמה": 90, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
+2. בחר 3-5 קורסים מתאימים (ציון 65-100). אם מועמד לא עומד בתנאי קבלה מהותי של קורס שבחרת לבחון, תן ציון 0 וכתוב "נפסל: ...".
+3. השתמש רק בקורסים ובלינקים מהרשימה למעלה (תמיד עם https://). כתוב נימוק תמציתי ומקצועי בעברית בגוף שלישי."""
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "נתוני השאלון של המועמד:\n" + json.dumps(req_body, ensure_ascii=False)}
+            {"role": "user", "content": "פרטי המועמד:\n" + json.dumps(req_body, ensure_ascii=False)}
         ]
 
-        # רק המודלים שבאמת זמינים בחשבון Groq שלך
         candidate_models = list(dict.fromkeys([
             primary_model,
             "openai/gpt-oss-120b",
@@ -301,7 +322,6 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         parsed = extract_json_object(raw_content)
         results_list = parsed.get("results", [])
 
-        # צירוף אוטומטי של עד 3 קורסים שנפסלו בגלל תאריך/ללא צפי (ללא בזבוז טוקנים במודל)
         existing_names = {r.get("שם הקורס") for r in results_list}
         for exp in expired_samples:
             if exp["שם הקורס"] not in existing_names:
