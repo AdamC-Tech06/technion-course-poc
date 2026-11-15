@@ -76,14 +76,19 @@ def check_course_date_status(row: dict, date_columns: list, cutoff_date: datetim
     return "ACTIVE"
 
 
-def load_courses_catalog() -> str:
+def load_courses_catalog() -> tuple[str, list]:
+    """
+    מחזיר:
+    1. טקסט מרוכז של הקורסים הפעילים בלבד (לחסכון בטוקנים ומניעת חריגת מגבלה ב-Groq)
+    2. רשימה של עד 3 קורסים שנפסלו אוטומטית בגלל תאריך/ללא צפי להצגה בטבלת הנפסלים
+    """
     sheet_id = "1emkWYVjlrhC0m67gz7b3MUXzsG3RtlX-kbg8eNvzBtc"
-    # הורדת כל הגיליון במלואו כקובץ אקסל בקריאה אחת
     excel_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
-    all_blocks = []
+    active_blocks = []
+    expired_samples = []
 
     try:
         response = requests.get(excel_url, timeout=25)
@@ -121,29 +126,74 @@ def load_courses_catalog() -> str:
 
                 status = check_course_date_status(row, date_columns, cutoff_date)
 
-                row_lines = [f"תחום/גיליון: {sheet_name}"]
-                if status == "EXPIRED":
-                    row_lines.append("סטטוס פתיחה: פג תוקף (עברו מעל 14 יום ממועד הפתיחה - חובה לתת ציון 0 ולפסול)")
-                elif status == "NO_SCHEDULE":
-                    row_lines.append("סטטוס פתיחה: ללא צפי פתיחה (חובה לתת ציון 0 ולפסול)")
-                else:
-                    row_lines.append("סטטוס פתיחה: פעיל ורלוונטי להרשמה")
+                # חילוץ קישור וקמפוס ותאריך גם עבור קורסים שנפסלו
+                link_val = "לא זמין"
+                campus_val = "לא צוין"
+                date_val = "לא צוין"
+                for col in clean_headers:
+                    v = row.get(col, "")
+                    if not v:
+                        continue
+                    if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and v != "לא זמין":
+                        link_val = v if (v.startswith("http://") or v.startswith("https://")) else "https://" + v
+                    elif "קמפוס" in col or "מיקום" in col:
+                        campus_val = v
+                    elif any(k in col for k in ["פתיחה", "התחלה", "מועד"]):
+                        date_val = v
 
+                if status in ("EXPIRED", "NO_SCHEDULE"):
+                    if len(expired_samples) < 3:
+                        reason = (
+                            "נפסל: מועד הפתיחה חלף (עברו מעל 14 יום) וההרשמה הסתיימה"
+                            if status == "EXPIRED"
+                            else "נפסל: אין כרגע מועד פתיחה צפוי לקורס"
+                        )
+                        expired_samples.append({
+                            "שם הקורס": course_name,
+                            "ציון התאמה": 0,
+                            "תאריך התחלה": date_val,
+                            "קמפוס": campus_val,
+                            "נימוק": reason,
+                            "לינק לעמוד התכנית": link_val
+                        })
+                    continue
+
+                # עבור קורסים פעילים בלבד - בניית בלוק תמציתי וברור
+                row_lines = [f"גיליון: {sheet_name}"]
                 for col in clean_headers:
                     val = row.get(col, "")
                     if val:
-                        if ("לינק" in col or "קישור" in col or "דפי מידע" in col or "אתר" in col) and val != "לא זמין":
+                        if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and val != "לא זמין":
                             if not val.startswith("http://") and not val.startswith("https://"):
                                 val = "https://" + val
+                        # קיצור שדות טקסט ארוכים מדי (כמו עלויות/תקנונים) כדי לא לחרוג ממכסת טוקנים
+                        if len(val) > 350:
+                            val = val[:350] + "..."
                         row_lines.append(f"{col}: {val}")
 
                 if row_lines:
-                    all_blocks.append("\n".join(row_lines))
+                    active_blocks.append("\n".join(row_lines))
 
     except Exception as e:
         logging.error(f"Failed to load courses workbook: {e}")
 
-    return "\n\n" + ("\n" + "=" * 80 + "\n\n").join(all_blocks)
+    catalog_text = "\n\n" + ("\n" + "-" * 40 + "\n\n").join(active_blocks)
+    return catalog_text, expired_samples
+
+
+def extract_json_object(raw_text: str) -> dict:
+    """מחלץ אובייקט JSON תקין גם אם מודל Reasoning הוסיף טקסט או בלוק קוד מסביב"""
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
+        cleaned = re.sub(r'\s*```$', '', cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r'\{[\s\S]*\}', cleaned)
+        if match:
+            return json.loads(match.group(0))
+        raise
 
 
 @app.route(route="match-courses", methods=["POST", "OPTIONS"])
@@ -164,8 +214,9 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     api_key = clean_env(os.environ.get("OPENAI_API_KEY", ""))
-    base_url = clean_env(os.environ.get("OPENAI_BASE_URL", "https://api.groq.com/openai/v1"))
-    model_name = clean_env(os.environ.get("OPENAI_MODEL", "llama-3.1-8b-instant"))
+    base_url = clean_env(os.environ.get("OPENAI_BASE_URL", "[https://api.groq.com/openai/v1](https://api.groq.com/openai/v1)"))
+    configured_model = clean_env(os.environ.get("OPENAI_MODEL", ""))
+    primary_model = configured_model if configured_model else "openai/gpt-oss-120b"
 
     if not api_key:
         return func.HttpResponse(
@@ -176,32 +227,29 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     try:
-        courses_catalog = load_courses_catalog()
+        courses_catalog, expired_samples = load_courses_catalog()
         today_str = datetime.now().strftime("%d/%m/%Y")
-        cutoff_str = (datetime.now() - timedelta(days=14)).strftime("%d/%m/%Y")
 
         client = OpenAI(api_key=api_key, base_url=base_url)
 
         system_prompt = f"""
 אתה יועץ לימודים ומנהל אקדמי מומחה של בית הספר ללימודי המשך של הטכניון.
 התאריך של היום: {today_str}.
-תאריך הסף להרשמה (14 יום אחורה מהיום): {cutoff_str}.
 
-תפקידך לנתח את פרטי השאלון שמילא המועמד, להצליב אותם מול קטלוג הקורסים הפעילים שלהלן, ולספק התאמה מדויקת ומנומקת.
+תפקידך לנתח את פרטי השאלון שמילא המועמד, להצליב אותם מול קטלוג הקורסים הפעילים שלהלן, ולהחזיר התאמה מדויקת ומנומקת.
 
-קטלוג הקורסים:
+קטלוג הקורסים הפעילים (כל הקורסים כאן בתוקף):
 {courses_catalog}
 
-הנחיות קריטיות לקביעת ציונים ופסילות:
-1. חוק 14 הימים וקורסים ללא צפי:
-   - כל קורס שמסומן ב'סטטוס פתיחה: פג תוקף' או שתאריך פתיחתו עבר את {cutoff_str} חייב לקבל ציון 0 ולהיפסל.
-   - כל קורס שמסומן ב'סטטוס פתיחה: ללא צפי פתיחה' חייב לקבל ציון 0 ולהיפסל.
-2. קורסים מומלצים:
-   - המלץ על 3-4 קורסים שהם ב'סטטוס פתיחה: פעיל ורלוונטי להרשמה' ותואמים ביותר לתחום ולרקע של המועמד (ציונים 60-100).
-   - החזר עד 3 קורסים שנפסלו (ציון 0).
-3. "ציון התאמה" חייב להיות מספר שלם בין 0 ל-100.
-4. השתמש בלינקים מהקטלוג (תמיד עם קידומת https://).
-5. החזר JSON תקין בלבד:
+הנחיות קריטיות (חובה להקפיד ב-100%):
+1. החזר אך ורק אובייקט JSON חוקי ותקני, ללא שום טקסט לפניו או אחריו.
+2. בחר 3 עד 5 קורסים מתאימים ביותר מתוך הקטלוג שלמעלה עבור המועמד (עם ציוני התאמה 65–100).
+3. אם מועמד אינו עומד בתנאי קבלה מהותי של קורס שבחרת לבחון — תן ציון 0 וכתוב נימוק שמתחיל ב"נפסל: ...".
+4. "ציון התאמה" חייב להיות מספר שלם (Integer) בין 0 ל-100.
+5. השתמש אך ורק בשמות הקורסים, תאריכי ההתחלה והלינקים שמופיעים בקטלוג שלמעלה (ודא קידומת https://).
+6. כתוב נימוק מקצועי, רהוט וחם בעברית בגוף שלישי ("המועמד").
+
+מבנה הפלט הנדרש:
 {{
   "results": [
     {{
@@ -209,7 +257,7 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
       "ציון התאמה": 95,
       "תאריך התחלה": "תאריך",
       "קמפוס": "קמפוס",
-      "נימוק": "נימוק בעברית מקצועית בגוף שלישי",
+      "נימוק": "נימוק מקצועי בעברית",
       "לינק לעמוד התכנית": "https://..."
     }}
   ]
@@ -221,34 +269,48 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
             {"role": "user", "content": "נתוני השאלון של המועמד:\n" + json.dumps(req_body, ensure_ascii=False)}
         ]
 
-        try:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                temperature=0.2,
-                response_format={"type": "json_object"}
-            )
-        except Exception as model_err:
-            logging.warning(f"Default model {model_name} failed. Attempting fallback: {model_err}")
-            available_models = [
-                m.id for m in client.models.list().data
-                if not any(x in m.id.lower() for x in ["whisper", "guard", "tts", "vision", "embed"])
-            ]
-            if not available_models:
-                raise model_err
-            fallback_model = available_models[0]
-            logging.info(f"Falling back to model: {fallback_model}")
-            response = client.chat.completions.create(
-                model=fallback_model,
-                messages=messages,
-                temperature=0.2,
-                response_format={"type": "json_object"}
-            )
+        # רק המודלים שבאמת זמינים בחשבון Groq שלך
+        candidate_models = list(dict.fromkeys([
+            primary_model,
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b"
+        ]))
 
-        ai_content = response.choices[0].message.content
+        last_error = None
+        response = None
+
+        for m_name in candidate_models:
+            try:
+                logging.info(f"Trying Groq model: {m_name}")
+                response = client.chat.completions.create(
+                    model=m_name,
+                    messages=messages,
+                    temperature=0.3
+                )
+                if response and response.choices and response.choices[0].message.content:
+                    break
+            except Exception as err:
+                logging.warning(f"Model {m_name} failed: {err}")
+                last_error = err
+
+        if not response or not response.choices:
+            raise last_error if last_error else Exception("Failed to get response from Groq models")
+
+        raw_content = response.choices[0].message.content
+        parsed = extract_json_object(raw_content)
+        results_list = parsed.get("results", [])
+
+        # צירוף אוטומטי של עד 3 קורסים שנפסלו בגלל תאריך/ללא צפי (ללא בזבוז טוקנים במודל)
+        existing_names = {r.get("שם הקורס") for r in results_list}
+        for exp in expired_samples:
+            if exp["שם הקורס"] not in existing_names:
+                results_list.append(exp)
+
+        final_payload = {"results": results_list}
 
         return func.HttpResponse(
-            ai_content,
+            json.dumps(final_payload, ensure_ascii=False),
             status_code=200,
             headers=CORS_HEADERS,
             mimetype="application/json"
