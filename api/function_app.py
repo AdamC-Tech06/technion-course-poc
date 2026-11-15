@@ -17,9 +17,47 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
-# תופס תאריכים רגילים (DD/MM/YYYY) וגם תאריכי Excel הפוכים (YYYY-MM-DD)
 DATE_DMY_PATTERN = re.compile(r'\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b')
 DATE_YMD_PATTERN = re.compile(r'\b(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})\b')
+
+# שדות הבחירה הספציפיים בטופס שמייצגים את תחום ההתעניינות המרכזי של המועמד
+INTEREST_FIELDS = [
+    "field",
+    "data_programming",
+    "data_interest",
+    "ai_interest",
+    "cyber_technical",
+    "cyber_interest",
+    "pm_experience",
+    "digital_interest",
+    "business_interest",
+]
+
+SYNONYM_MAP = {
+    "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט"},
+    "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט"},
+    "אתרי": {"full", "stack", "פיתוח", "אתרים", "בניית", "web", "tcwd", "אינטרנט"},
+    "full": {"stack", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט"},
+    "stack": {"full", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd", "אינטרנט"},
+    "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות", "אתרי", "אינטרנט"},
+    "תכנות": {"full", "stack", "פיתוח", "תוכנה", "python", "web"},
+    "ai": {"בינה", "מלאכותית", "generative", "llm", "machine", "learning"},
+    "בינה": {"ai", "llm", "generative", "דאטה", "data", "עסקית", "bi"},
+    "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה"},
+    "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט"},
+    "אנליסט": {"analyst", "דאטה", "data", "bi", "נתונים"},
+    "bi": {"בינה", "עסקית", "דאטה", "data", "analyst"},
+    "סייבר": {"cyber", "אבטחת", "מידע", "רשתות", "מיישמי"},
+    "cyber": {"סייבר", "אבטחת", "מידע", "מיישמי"},
+    "qa": {"בדיקות", "בודקי", "תוכנה", "איכות", "tcqa"},
+    "בדיקות": {"qa", "בודקי", "תוכנה", "איכות", "tcqa"},
+    "מוצר": {"product", "management", "מאפיינים", "ניתוח", "מערכות"},
+    "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ", "דירקטורים", "pmp"},
+    "פרויקטים": {"ניהול", "pmp", "מערכות", "agile"},
+    "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי", "מוסמך"},
+    "הנדסה": {"מהנדסים", "me", "תואר", "שני", "מערכות", "אזרחית"},
+    "שיווק": {"דיגיטלי", "digital", "מכירות", "עסקי"},
+}
 
 
 def clean_env(val: str) -> str:
@@ -29,7 +67,6 @@ def clean_env(val: str) -> str:
 
 
 def extract_dates_from_value(val) -> list:
-    """מחלץ תאריכים גם מאובייקט datetime של Excel וגם מטקסט בכל פורמט"""
     if not val:
         return []
     if isinstance(val, datetime):
@@ -38,7 +75,6 @@ def extract_dates_from_value(val) -> list:
     text = str(val)
     parsed_dates = []
 
-    # בדיקה ראשונה: פורמט YYYY-MM-DD (נפוץ בהמרת תאי אקסל)
     for match in DATE_YMD_PATTERN.finditer(text):
         year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
         try:
@@ -49,7 +85,6 @@ def extract_dates_from_value(val) -> list:
     if parsed_dates:
         return parsed_dates
 
-    # בדיקה שנייה: פורמט DD/MM/YYYY או DD.MM.YY
     for match in DATE_DMY_PATTERN.finditer(text):
         day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
         if year < 100:
@@ -63,13 +98,11 @@ def extract_dates_from_value(val) -> list:
 
 
 def format_cell_display(val) -> str:
-    """ממיר ערך תא לתצוגה נקייה (אם זה תאריך אקסל, מציג DD/MM/YYYY)"""
     if val is None:
         return ""
     if isinstance(val, datetime):
         return val.strftime("%d/%m/%Y")
     text = str(val).strip()
-    # ניקוי 00:00:00 מתאריכי אקסל שהומרו למחרוזת
     text = re.sub(r'(\d{4}-\d{2}-\d{2})\s+00:00:00', r'\1', text)
     return text
 
@@ -77,7 +110,7 @@ def format_cell_display(val) -> str:
 def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: datetime) -> str:
     for col in date_columns:
         val = str(raw_row.get(col, "")).strip()
-        if "ללא צפי" in val or "לא ידוע" in val:
+        if any(phrase in val for phrase in ["ללא צפי", "לא צפי", "לא ידוע", "טרם נקבע"]):
             return "NO_SCHEDULE"
 
     found_dates = []
@@ -109,56 +142,53 @@ def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: dat
     return "ACTIVE"
 
 
-def extract_user_keywords(req_body: dict) -> set:
-    """מחלץ מילות מפתח ושורשים מתשובות המועמד לצורך סינון ראשוני מדויק"""
-    form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
-    raw_tokens = []
-    for k, v in form_data.items():
-        if v and str(v).strip().lower() not in ("null", "none", ""):
-            raw_tokens.append(str(v).lower())
-
-    full_text = " ".join(raw_tokens)
-    words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', full_text))
-
-    synonym_map = {
-        "בניית": {"full", "stack", "פיתוח", "אתרי", "אתרים", "web", "tcwd", "אינטרנט"},
-        "אתרים": {"full", "stack", "פיתוח", "אתרי", "בניית", "web", "tcwd", "אינטרנט"},
-        "אתרי": {"full", "stack", "פיתוח", "אתרים", "בניית", "web", "tcwd"},
-        "full": {"stack", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd"},
-        "stack": {"full", "פיתוח", "אתרים", "אתרי", "web", "תוכנה", "tcwd"},
-        "פיתוח": {"full", "stack", "web", "תוכנה", "מפתחי", "תכנות", "אתרי"},
-        "תכנות": {"full", "stack", "פיתוח", "תוכנה", "python", "web"},
-        "ai": {"בינה", "מלאכותית", "generative", "llm", "machine", "learning"},
-        "בינה": {"ai", "llm", "generative", "דאטה", "data", "עסקית", "bi"},
-        "data": {"דאטה", "נתונים", "bi", "analyst", "אנליסט", "בינה"},
-        "דאטה": {"data", "נתונים", "bi", "analyst", "אנליסט"},
-        "סייבר": {"cyber", "אבטחת", "מידע", "רשתות", "מיישמי"},
-        "cyber": {"סייבר", "אבטחת", "מידע"},
-        "qa": {"בדיקות", "בודקי", "תוכנה", "איכות"},
-        "בדיקות": {"qa", "בודקי", "תוכנה", "איכות"},
-        "מוצר": {"product", "management", "מאפיינים"},
-        "ניהול": {"מנהלים", "פרויקטים", "מערכות", "mba", "מנמ", "דירקטורים"},
-        "תואר": {"שני", "me", "mba", "הנדסה", "אקדמי"},
-    }
+def expand_words(words: set) -> set:
     expanded = set(words)
     for w in words:
-        if w in synonym_map:
-            expanded.update(synonym_map[w])
+        if w in SYNONYM_MAP:
+            expanded.update(SYNONYM_MAP[w])
     return expanded
 
 
+def extract_user_keywords(req_body: dict) -> tuple[set, set]:
+    """
+    מחזיר שני סטים של מילות מפתח:
+    1. primary_keywords: מתוך שדות הבחירה של תחום העניין וההתמחות (בעלי משקל גבוה)
+    2. general_keywords: מתוך שאר שדות הטופס (רקע, יעדים, השכלה)
+    """
+    form_data = req_body.get("body", req_body) if isinstance(req_body, dict) else {}
+    primary_tokens = []
+    general_tokens = []
+
+    for k, v in form_data.items():
+        if not v or str(v).strip().lower() in ("null", "none", ""):
+            continue
+        val_str = str(v).lower()
+        if k in INTEREST_FIELDS:
+            primary_tokens.append(val_str)
+        else:
+            general_tokens.append(val_str)
+
+    primary_words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', " ".join(primary_tokens)))
+    general_words = set(re.findall(r'[a-zA-Z\u0590-\u05FF]{2,}', " ".join(general_tokens)))
+
+    return expand_words(primary_words), expand_words(general_words)
+
+
 def get_course_name_from_row(row: dict, clean_headers: list) -> str:
-    """מזהה את שם הקורס גם אם כותרת העמודה משתנה בין הלשוניות"""
     priority_keys = ["שם הקורס", "שם התוכנית", "שם התכנית", "שם תוכנית", "שם קורס", "הכשרה", "תוכנית"]
     for pk in priority_keys:
         if row.get(pk):
             return row[pk]
     for h in clean_headers:
         if ("שם" in h or "קורס" in h or "תוכנית" in h or "תכנית" in h) and row.get(h):
-            # מוודא שלא לוקח בטעות עמודת מק"ט או לינק
             val = row[h]
             if not val.startswith("http") and not val.isdigit():
                 return val
+    for h in clean_headers:
+        val = row.get(h, "")
+        if val and len(val) > 3 and not val.startswith("http") and not val.replace("-", "").isdigit():
+            return val
     return ""
 
 
@@ -168,7 +198,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
 
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
-    user_keywords = extract_user_keywords(req_body)
+    primary_kw, general_kw = extract_user_keywords(req_body)
 
     active_courses = []
     expired_samples = []
@@ -242,14 +272,16 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                         })
                     continue
 
-                # ניקוד התאמה מילולי: משקל גבוה להתאמה בשם הקורס או בלשונית
                 title_lower = f"{sheet_name} {course_name}".lower()
-                desc_lower = " ".join(
-                    str_row.get(c, "") for c in clean_headers
-                    if any(k in c for k in ["תחום", "תיאור", "אודות", "תנאי", "מתכונת"])
-                ).lower()
+                desc_lower = " ".join(str_row.values()).lower()
 
-                score = sum(5 for kw in user_keywords if kw in title_lower) + sum(1 for kw in user_keywords if kw in desc_lower)
+                # ניקוד אוניברסלי: התאמה ישירה לבחירת תחום ההתעניינות של המועמד מקבלת עדיפות עליונה בכל גיליון
+                score = (
+                    sum(15 for kw in primary_kw if kw in title_lower)
+                    + sum(4 for kw in primary_kw if kw in desc_lower)
+                    + sum(3 for kw in general_kw if kw in title_lower)
+                    + sum(1 for kw in general_kw if kw in desc_lower)
+                )
 
                 compact_lines = [
                     f"תחום/גיליון: {sheet_name}",
@@ -262,7 +294,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     if any(k in col for k in ["תיאור", "אודות", "תנאי קבלה", "מתכונת"]):
                         val = str_row.get(col, "")
                         if val:
-                            compact_lines.append(f"{col}: {val[:220]}")
+                            compact_lines.append(f"{col}: {val[:200]}")
 
                 active_courses.append((score, "\n".join(compact_lines)))
 
@@ -270,7 +302,8 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
         logging.error(f"Failed to load courses workbook: {e}")
 
     active_courses.sort(key=lambda x: x[0], reverse=True)
-    top_blocks = [item[1] for item in active_courses[:10]]
+    # לקיחת 12 המועמדים המובילים (נשאר בבטחה מתחת למגבלת ה-7,000 טוקנים של Groq)
+    top_blocks = [item[1] for item in active_courses[:12]]
 
     catalog_text = "\n\n" + ("\n" + "-" * 30 + "\n\n").join(top_blocks)
     return catalog_text, expired_samples
