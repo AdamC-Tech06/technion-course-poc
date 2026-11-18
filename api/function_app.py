@@ -76,7 +76,6 @@ def clean_env(val: str) -> str:
 
 
 def find_header_row_index(rows: list) -> int:
-    """מאתר אוטומטית באיזו שורה נמצאות כותרות העמודות בכל לשונית"""
     best_idx = 0
     best_hits = 0
     for idx, r in enumerate(rows[:10]):
@@ -137,7 +136,7 @@ def format_cell_display(val) -> str:
 def check_course_date_status(raw_row: dict, date_columns: list, cutoff_date: datetime) -> str:
     for col in date_columns:
         val = str(raw_row.get(col, "")).strip()
-        if any(phrase in val for phrase in ["ללא צפי", "לא צפי", "לא ידוע", "טרם נקבע", "אין צפי"]):
+        if any(phrase in val for phrase in ["ללא צפי", "לא צפי", "לא ידוע", "טרם נקבע", "אין צפי", "מבוטל"]):
             return "NO_SCHEDULE"
 
     found_dates = []
@@ -274,7 +273,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                         continue
                     if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and v != "לא זמין":
                         link_val = v if (v.startswith("http://") or v.startswith("https://")) else "https://" + v
-                    elif "קמפוס" in col or "מיקום" in col:
+                    elif any(k in col for k in ["קמפוס", "מיקום", "שלוחה"]):
                         campus_val = v
                     elif any(k in col for k in ["פתיחה", "התחלה", "מועד"]):
                         date_val = v
@@ -288,6 +287,13 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 )
 
                 if status in ("EXPIRED", "NO_SCHEDULE"):
+                    # ניקוי הערות פנימיות של רכזות כדי שלא ידלפו לתצוגת המועמד
+                    if status == "NO_SCHEDULE":
+                        clean_date_display = "אין צפי פתיחה"
+                    else:
+                        extracted = extract_dates_from_value(date_val)
+                        clean_date_display = extracted[0].strftime("%d/%m/%Y") if extracted else "הרשמה נסגרה"
+
                     reason = (
                         "נפסל: מועד הפתיחה חלף (עברו מעל 14 יום) וההרשמה הסתיימה"
                         if status == "EXPIRED"
@@ -298,7 +304,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                         {
                             "שם הקורס": course_name,
                             "ציון התאמה": 0,
-                            "תאריך התחלה": date_val,
+                            "תאריך התחלה": clean_date_display,
                             "קמפוס": campus_val,
                             "נימוק": reason,
                             "לינק לעמוד התכנית": link_val
@@ -322,11 +328,11 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     if any(k in col for k in ["תנאי קבלה", "קהל יעד", "דרישות"]):
                         val = str_row.get(col, "")
                         if val:
-                            compact_lines.append(f"תנאי קבלה: {val[:140]}")
+                            compact_lines.append(f"תנאי קבלה: {val[:180]}")
                     elif any(k in col for k in ["תיאור", "אודות", "מתכונת"]):
                         val = str_row.get(col, "")
                         if val:
-                            compact_lines.append(f"{col}: {val[:120]}")
+                            compact_lines.append(f"{col}: {val[:130]}")
 
                 active_courses.append((total_score, "\n".join(compact_lines)))
 
@@ -394,17 +400,18 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
         client = OpenAI(api_key=api_key, base_url=base_url)
 
         system_prompt = f"""אתה יועץ לימודים אקדמי של בית הספר ללימודי המשך של הטכניון. התאריך היום: {today_str}.
-התאם את פרטי המועמד לרשימת הקורסים הפעילים הבאה (הרשימה מדורגת מהרלוונטי ביותר):
+התאם את פרטי המועמד לרשימת הקורסים הפעילים הבאה:
 
 {courses_catalog}
 
 הנחיות קריטיות (חובה להקפיד ב-100%):
 1. החזר אך ורק אובייקט JSON תקין במבנה:
 {{"results": [{{"שם הקורס": "...", "ציון התאמה": 92, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
-2. בחירת מומלצים (חובה להחזיר 3 עד 5 קורסים מומלצים עם ציון 65-100):
-   - תן עדיפות עליונה (ציון 85-100) לקורסים שתואמים ישירות להתמחות הספציפית שהמועמד בחר בשאלון.
-   - אם יש פחות מ-3 קורסים בהתמחות הספציפית, השלם את הרשימה ל-3 עד 5 קורסים מתוך הקורסים הקרובים ביותר לתחום העניין הכללי של המועמד (ציון 65-80).
-3. פסילת תנאי קבלה: אם יש ברשימה קורס מהתחום המבוקש שהמועמד אינו עומד בתנאי הקבלה שלו, כלול אותו עם "ציון התאמה": 0 ונימוק שמתחיל במילה "נפסל: ...".
+2. בדיקת רקע תעסוקתי ותנאי קבלה (קריטי!):
+   - שים לב לשדה תחום העיסוק הנוכחי (current_field) ולשנות הניסיון (experience). אל תניח ששנות הניסיון של המועמד הן בתחום הטכנולוגי אם תחום העיסוק שלו הוא תחום אחר (כגון "חינוך והוראה", "בריאות", "פיננסים" וכו')!
+   - אם קורס מיועד למנהלים בכירים או דורש ניסיון קודם בהייטק/אבטחת מידע (כגון קורסי CISO, מנמ"רים, Executives או קורסים מתקדמים) ולמועמד אין רקע תעסוקתי רלוונטי — **חובה לפסול את הקורס עם `"ציון התאמה": 0`** ונימוק שמתחיל ב`"נפסל: הקורס דורש ניסיון קודם בתחום..."`.
+   - למועמדים ללא רקע טכנולוגי קודם, המלץ רק על מסלולי כניסה והסבה (כגון "מיישמי סייבר ואבטחת מידע") עם ציון 80–95.
+3. התעלם משמות המפתחות באנגלית ב-JSON והתייחס רק לערכים בעברית שבחרו המועמדים (אל תכתוב "תחום ה-AI" אם המועמד בחר סייבר או דאטה).
 4. השתמש אך ורק בשמות הקורסים, התאריכים והלינקים המדויקים מהרשימה למעלה. כתוב נימוק מקצועי בעברית בגוף שלישי."""
 
         messages = [
