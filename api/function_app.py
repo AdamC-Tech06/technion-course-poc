@@ -75,6 +75,13 @@ def clean_env(val: str) -> str:
     return re.sub(r'[^\x21-\x7E]', '', val)
 
 
+def sanitize_text(text: str) -> str:
+    """ממיר מירכאות כפולות וירידות שורה כדי למנוע שבירת JSON בפלט של המודל"""
+    if not text:
+        return ""
+    return text.replace('"', "'").replace('\n', ' ').replace('\r', ' ').strip()
+
+
 def find_header_row_index(rows: list) -> int:
     best_idx = 0
     best_hits = 0
@@ -220,7 +227,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
 
     today = datetime.now()
     cutoff_date = today - timedelta(days=14)
-    topic_kw, general_kw, topic_text = extract_topic_and_general_keywords(req_body)
+    topic_kw, general_kw, _ = extract_topic_and_general_keywords(req_body)
 
     active_courses = []
     expired_samples = []
@@ -262,6 +269,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 if not course_name or course_name in ("שם הקורס", "שם התוכנית", "שם התכנית", "שם תוכנית"):
                     continue
 
+                clean_course_name = sanitize_text(course_name)
                 status = check_course_date_status(raw_row, date_columns, cutoff_date)
 
                 link_val = "לא זמין"
@@ -274,11 +282,11 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     if any(k in col for k in ["לינק", "קישור", "דפי מידע", "אתר"]) and v != "לא זמין":
                         link_val = v if (v.startswith("http://") or v.startswith("https://")) else "https://" + v
                     elif any(k in col for k in ["קמפוס", "מיקום", "שלוחה"]):
-                        campus_val = v
+                        campus_val = sanitize_text(v)
                     elif any(k in col for k in ["פתיחה", "התחלה", "מועד"]):
-                        date_val = v
+                        date_val = sanitize_text(v)
 
-                course_title_lower = course_name.lower()
+                course_title_lower = clean_course_name.lower()
                 sheet_lower = sheet_name.lower()
 
                 topic_match_score = (
@@ -287,7 +295,6 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 )
 
                 if status in ("EXPIRED", "NO_SCHEDULE"):
-                    # ניקוי הערות פנימיות של רכזות כדי שלא ידלפו לתצוגת המועמד
                     if status == "NO_SCHEDULE":
                         clean_date_display = "אין צפי פתיחה"
                     else:
@@ -302,7 +309,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                     expired_samples.append((
                         topic_match_score,
                         {
-                            "שם הקורס": course_name,
+                            "שם הקורס": clean_course_name,
                             "ציון התאמה": 0,
                             "תאריך התחלה": clean_date_display,
                             "קמפוס": campus_val,
@@ -322,17 +329,17 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
                 )
 
                 compact_lines = [
-                    f"קורס: {course_name} | קטגוריה: {sheet_name} | פתיחה: {date_val} | קמפוס: {campus_val} | לינק: {link_val}"
+                    f"קורס: {clean_course_name} | קטגוריה: {sanitize_text(sheet_name)} | פתיחה: {date_val} | קמפוס: {campus_val} | לינק: {link_val}"
                 ]
                 for col in clean_headers:
                     if any(k in col for k in ["תנאי קבלה", "קהל יעד", "דרישות"]):
-                        val = str_row.get(col, "")
+                        val = sanitize_text(str_row.get(col, ""))
                         if val:
-                            compact_lines.append(f"תנאי קבלה: {val[:180]}")
+                            compact_lines.append(f"תנאי קבלה: {val[:160]}")
                     elif any(k in col for k in ["תיאור", "אודות", "מתכונת"]):
-                        val = str_row.get(col, "")
+                        val = sanitize_text(str_row.get(col, ""))
                         if val:
-                            compact_lines.append(f"{col}: {val[:130]}")
+                            compact_lines.append(f"{sanitize_text(col)}: {val[:120]}")
 
                 active_courses.append((total_score, "\n".join(compact_lines)))
 
@@ -340,7 +347,7 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
         logging.error(f"Failed to load courses workbook: {e}")
 
     active_courses.sort(key=lambda x: x[0], reverse=True)
-    top_blocks = [item[1] for item in active_courses[:24]]
+    top_blocks = [item[1] for item in active_courses[:20]]
 
     expired_samples.sort(key=lambda x: x[0], reverse=True)
     top_expired = [item[1] for item in expired_samples[:3]]
@@ -350,16 +357,35 @@ def load_filtered_courses_catalog(req_body: dict) -> tuple[str, list]:
 
 
 def extract_json_object(raw_text: str) -> dict:
-    cleaned = raw_text.strip()
+    # הסרת בלוקי חשיבה פנימיים אם קיימים (למשל במודלי Reasoning)
+    cleaned = re.sub(r'<think>[\s\S]*?</think>', '', raw_text).strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
         cleaned = re.sub(r'\s*```$', '', cleaned)
+
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         match = re.search(r'\{[\s\S]*\}', cleaned)
         if match:
-            return json.loads(match.group(0))
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        # מנגנון התאוששות חכם: חילוץ כל אובייקט קורס תקין בנפרד כדי למנוע קריסת 500
+        recovered_items = []
+        for obj_match in re.finditer(r'\{[^{}]*"שם הקורס"[^{}]*\}', cleaned):
+            try:
+                item = json.loads(obj_match.group(0))
+                recovered_items.append(item)
+            except Exception:
+                continue
+
+        if recovered_items:
+            logging.warning(f"Recovered {len(recovered_items)} valid JSON objects from malformed AI output.")
+            return {"results": recovered_items}
+
         raise
 
 
@@ -407,12 +433,13 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
 הנחיות קריטיות (חובה להקפיד ב-100%):
 1. החזר אך ורק אובייקט JSON תקין במבנה:
 {{"results": [{{"שם הקורס": "...", "ציון התאמה": 92, "תאריך התחלה": "...", "קמפוס": "...", "נימוק": "...", "לינק לעמוד התכנית": "https://..."}}]}}
-2. בדיקת רקע תעסוקתי ותנאי קבלה (קריטי!):
-   - שים לב לשדה תחום העיסוק הנוכחי (current_field) ולשנות הניסיון (experience). אל תניח ששנות הניסיון של המועמד הן בתחום הטכנולוגי אם תחום העיסוק שלו הוא תחום אחר (כגון "חינוך והוראה", "בריאות", "פיננסים" וכו')!
-   - אם קורס מיועד למנהלים בכירים או דורש ניסיון קודם בהייטק/אבטחת מידע (כגון קורסי CISO, מנמ"רים, Executives או קורסים מתקדמים) ולמועמד אין רקע תעסוקתי רלוונטי — **חובה לפסול את הקורס עם `"ציון התאמה": 0`** ונימוק שמתחיל ב`"נפסל: הקורס דורש ניסיון קודם בתחום..."`.
-   - למועמדים ללא רקע טכנולוגי קודם, המלץ רק על מסלולי כניסה והסבה (כגון "מיישמי סייבר ואבטחת מידע") עם ציון 80–95.
-3. התעלם משמות המפתחות באנגלית ב-JSON והתייחס רק לערכים בעברית שבחרו המועמדים (אל תכתוב "תחום ה-AI" אם המועמד בחר סייבר או דאטה).
-4. השתמש אך ורק בשמות הקורסים, התאריכים והלינקים המדויקים מהרשימה למעלה. כתוב נימוק מקצועי בעברית בגוף שלישי."""
+2. הגבלת אורך: החזר בסך הכל בין 4 ל-7 קורסים בלבד במערך results (3-4 מומלצים עם ציון 70-100, ועד 3 שנפסלו עם ציון 0). אל תחזיר את כל הרשימה!
+3. חוק תחביר JSON: לעולם אל תשתמש במירכאות כפולות (") בתוך ערכי הטקסט (השתמש בגרש בודד ' במקום זאת, למשל מנמ'רים).
+4. בדיקת רקע תעסוקתי ותנאי קבלה:
+   - שים לב לתחום העיסוק הנוכחי (current_field) ולשנות הניסיון (experience). אל תניח ששנות הניסיון הן בהייטק אם המועמד עובד בתחום אחר (כגון חינוך והוראה, בריאות, פיננסים וכו').
+   - אם קורס מיועד למנהלים בכירים או דורש ניסיון קודם בהייטק/סייבר (כגון קורסי CISO, מנמ'רים, Executives) ולמועמד אין רקע תעסוקתי רלוונטי — פסול אותו עם ציון 0 ונימוק שמתחיל ב-נפסל: ...
+   - למועמדים ללא רקע טכנולוגי קודם, המלץ רק על מסלולי כניסה והסבה מתאימים.
+5. התעלם משמות המפתחות באנגלית ב-JSON והתייחס רק לערכים בעברית שבחרו המועמדים."""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -435,7 +462,8 @@ def match_courses(req: func.HttpRequest) -> func.HttpResponse:
                 response = client.chat.completions.create(
                     model=m_name,
                     messages=messages,
-                    temperature=0.2
+                    temperature=0.2,
+                    max_tokens=2500
                 )
                 if response and response.choices and response.choices[0].message.content:
                     break
